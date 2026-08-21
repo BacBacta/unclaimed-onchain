@@ -95,6 +95,21 @@ Snapshots age. The *Verify live* button always re-reads the contract before any
 withdrawal, so a stale snapshot can never cause a wrong transaction — at worst it
 shows an amount that has already been claimed.
 
+### Addresses the snapshot does not know
+
+An address credited after the snapshot date, or below its $25 floor, is not in the
+embedded data. Searching it offers a **live scan** instead: every protocol-token
+pair the registry tracks (102 across the three chains) is read in a single
+`eth_call` per chain through [Multicall3](https://www.multicall3.com/), via your
+own wallet's RPC — about two seconds for full coverage, token decimals read the
+same way. Balances found this way get the same claim and deliver buttons as
+snapshot results.
+
+The honest limit, stated in the interface: the scan covers pairs *seen in the
+snapshot*. A token that first appeared after August 21, 2026 cannot be discovered
+from a browser without an indexer — the explorer method above remains the
+complete check.
+
 ### Known limits
 
 - Tokens without a market price are counted as zero, so the totals are a floor.

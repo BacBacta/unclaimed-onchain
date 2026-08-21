@@ -384,6 +384,12 @@ const I18N = {
     verify:"Verify live", claimOn:"Claim on {name}",
     actNote:"You'll sign one transaction per protocol. Funds go to your address.",
     noVerify:"Nothing to verify for this chain in the snapshot. Use the Etherscan method for a manual check.",
+    scanChain:"Scanning {name} — {n} balances in a single call…",
+    sweepFound:"Found: {n} credited balance(s), read directly from the contracts. The snapshot doesn't know this address — these figures are live.",
+    sweepNone:"Nothing credited to this address in any of the {n} protocol-token pairs this registry tracks — read live from the contracts, not from the snapshot. A token that first appeared after August 21, 2026 would not show here: the explorer method above remains the complete check.",
+    sweepSkipped:"Not scanned: {names}. Add that network to your wallet and run the scan again for full coverage.",
+    sweepCap:"This live scan covers the {n} protocol-token pairs seen in the snapshot. A brand-new token would not appear here — the explorer links remain the complete check.",
+    liveShort:"live \u2713",
     reading:"Reading real balances…",
     connecting:"Checking your wallet…",
     switching:"Your wallet is on another network. Asking it to switch to {name} — approve that in the extension. If no window opens, click the wallet icon in your toolbar: the request is waiting there. You can also switch to {name} yourself in the wallet, then click again.",
@@ -649,7 +655,7 @@ function lookup(addrRaw) {
     if (hasWallet()) {
       const b = el("button", "small ghost", t("liveScan"));
       b.style.marginTop = "14px";
-      b.addEventListener("click", () => verifyLive(addr, null));
+      b.addEventListener("click", () => liveSweep(addr));
       box.appendChild(b);
     }
     out.appendChild(box);
@@ -845,6 +851,165 @@ async function accountKind(addr, chainId) {
   else                                res = { kind: "contract", target: null };
   kindCache.set(key, res);
   return res;
+}
+
+/* ── balayage complet via Multicall3 ────────────────────────────
+   Pour une adresse absente de l'instantané, « vérifier en direct »
+   doit interroger la chaîne, pas l'instantané. Multicall3 — contrat
+   canonique, bytecode identique sur les trois chaînes — regroupe
+   toutes les lectures d'une chaîne en un seul eth_call.            */
+const MC3 = "0xca11bde05977b3631167028862be2a173976ca11";
+
+let sweepMap = null;
+function sweepCombos() {
+  if (sweepMap) return sweepMap;
+  sweepMap = new Map();
+  const seen = new Set();
+  for (const rows of Object.values(SNAP.a))
+    for (const [pi, ci, ti] of rows) {
+      const k = pi + "|" + ci + "|" + ti;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const chainId = CHAINS[ci];
+      if (!sweepMap.has(chainId)) sweepMap.set(chainId, []);
+      sweepMap.get(chainId).push({proto: PROTO[pi], token: SNAP.t[ti][0], symbol: SNAP.t[ti][1]});
+    }
+  return sweepMap;
+}
+const sweepSize = () => [...sweepCombos().values()].reduce((s, a) => s + a.length, 0);
+
+/* aggregate3((address,bool,bytes)[]) — sélecteur 0x82ad56cb */
+function encodeAggregate3(calls) {
+  let head = "", tail = "";
+  const base = calls.length * 32;
+  for (const c of calls) {
+    head += padUint(base + tail.length / 2);
+    const d = c.data.slice(2);
+    tail += padAddr(c.to) + padUint(1) + padUint(96) + padUint(d.length / 2) + d
+          + "0".repeat(((32 - (d.length / 2) % 32) % 32) * 2);
+  }
+  return "0x82ad56cb" + padUint(32) + padUint(calls.length) + head + tail;
+}
+function decodeAggregate3(hex) {
+  const w = i => hex.slice(2 + i * 64, 2 + (i + 1) * 64);
+  const n = parseInt(w(1), 16), res = [];
+  for (let i = 0; i < n; i++) {
+    const off = parseInt(w(2 + i), 16) / 32 + 2;
+    const dOff = off + parseInt(w(off + 1), 16) / 32;
+    const len = parseInt(w(dOff), 16);
+    res.push({ ok: parseInt(w(off), 16) === 1,
+               data: "0x" + hex.slice(2 + (dOff + 1) * 64, 2 + (dOff + 1) * 64 + len * 2) });
+  }
+  return res;
+}
+
+async function liveSweep(addr) {
+  const m = message(t("connecting"), null);
+  statusNode = m;
+  try {
+    await connected();
+    const p = await provider();
+    const combosByChain = sweepCombos();
+    // commence par la chaîne courante du wallet : une bascule de moins
+    const cur = String(await ask(p, "eth_chainId", [], RPC_MS)).toLowerCase();
+    const order = [...combosByChain.keys()]
+      .sort((a, b) => (CHAIN_META[b].hex === cur) - (CHAIN_META[a].hex === cur));
+    const groups = new Map(), skipped = [];
+    for (const chainId of order) {
+      const combos = combosByChain.get(chainId);
+      m.textContent = t("scanChain", {name: CHAIN_META[chainId].name, n: combos.length});
+      const calls = combos.map(c => balanceCall(c, addr));
+      const toks = [...new Set(combos.map(c => clean(c.token)).filter(tk => tk !== NATIVE))];
+      for (const tk of toks) calls.push({ to: "0x" + tk, data: "0x313ce567" });  // decimals()
+      let res;
+      try {
+        res = decodeAggregate3(await ethCall(chainId, MC3, encodeAggregate3(calls)));
+      } catch (e) { skipped.push(CHAIN_META[chainId].name); continue; }
+      const dec = {};
+      toks.forEach((tk, i) => {
+        const r = res[combos.length + i];
+        let d = (r && r.ok && r.data.length >= 66) ? parseInt(r.data.slice(0, 66), 16) : 18;
+        if (!(d >= 0 && d <= 36)) d = 18;
+        dec[tk] = d;
+      });
+      const found = [];
+      combos.forEach((c, i) => {
+        const r = res[i];
+        if (!r || !r.ok || r.data.length < 66) return;
+        let v = BigInt(r.data.slice(0, 66));
+        if (c.proto === "v1" && v > 0n) v -= 1n;      // le wei sentinelle de SplitMain
+        if (v === 0n) return;
+        const d = clean(c.token) === NATIVE ? 18 : dec[clean(c.token)];
+        found.push({ proto: c.proto, chainId, token: c.token, symbol: c.symbol,
+                     amount: Number(v) / 10 ** d, usd: 0 });
+      });
+      if (found.length) groups.set(chainId, found);
+    }
+    current = { addr, groups };
+    const n = [...groups.values()].reduce((s, a) => s + a.length, 0);
+    if (n) {
+      m.textContent = t("sweepFound", {n});
+      m.classList.add("ok");
+      renderSweep();
+      out.appendChild(el("div", "msg status", t("sweepCap", {n: sweepSize()})));
+    } else {
+      m.textContent = t("sweepNone", {n: sweepSize()});
+      m.classList.add("ok");
+    }
+    if (skipped.length) message(t("sweepSkipped", {names: skipped.join(", ")}), "warn", true);
+  } catch (e) {
+    m.textContent = (e && e.message) || String(e);
+    m.classList.add("err"); m.classList.remove("ok");
+  } finally { statusNode = null; }
+}
+
+function renderSweep() {
+  if (isDelivery()) {
+    const d = el("div", "glass edge deliver");
+    d.appendChild(el("div", "ico", "\u2192"));
+    const body = document.createElement("div");
+    body.appendChild(el("h4", null, t("deliverH")));
+    body.appendChild(el("p", null, t("deliverP", {
+      you: shortAddr(myAddr), them: shortAddr(current.addr) })));
+    d.appendChild(body);
+    out.appendChild(d);
+  }
+  for (const [chainId, positions] of current.groups) {
+    const meta = CHAIN_META[chainId];
+    const box = el("div", "chain reveal");
+    const head = el("div", "chain-head");
+    head.appendChild(el("h3", null, meta.name));
+    head.appendChild(el("div", "amt", t("liveShort")));
+    box.appendChild(head);
+    positions.sort((a, b) => b.amount - a.amount);
+    for (const p of positions) {
+      const row = el("div", "pos");
+      row.appendChild(el("div", "tok", fmtAmt(p.amount) + " " + p.symbol));
+      row.appendChild(el("div", "usd", t("liveShort")));
+      row.appendChild(el("div", "src",
+        { v1: t("v1n"), v2: t("v2n"), zora: t("zoran"), clanker: t("clankern") }[p.proto]));
+      box.appendChild(row);
+    }
+    const act = el("div", "chain-act");
+    const bc = el("button", "small", isDelivery()
+      ? t("deliverTo", {addr: shortAddr(current.addr)})
+      : t("claimOn", {name: meta.name}));
+    bc.addEventListener("click", () => claim(chainId, positions));
+    act.appendChild(bc);
+    act.appendChild(el("div", "note", isDelivery() ? t("deliverNote") : t("actNote")));
+    box.appendChild(act);
+    const protos = [...new Set(positions.map(p => p.proto))];
+    const links = el("div", "explorers");
+    links.appendChild(el("span", "lbl", t("openExplorer")));
+    for (const pr of protos) {
+      const a = el("a", "explink", { v1: t("v1n"), v2: t("v2n"),
+                                     zora: t("zoran"), clanker: t("clankern") }[pr]);
+      a.href = explorerUrl(pr, chainId); a.target = "_blank"; a.rel = "noopener noreferrer";
+      links.appendChild(a);
+    }
+    box.appendChild(links);
+    out.appendChild(box);
+  }
 }
 
 function balanceCall(pos, addr) {
