@@ -386,8 +386,11 @@ const I18N = {
     noVerify:"Nothing to verify for this chain in the snapshot. Use the Etherscan method for a manual check.",
     reading:"Reading real balances…",
     connecting:"Checking your wallet…",
+    checkWallet:"Waiting on your wallet — a confirmation should be open in the extension. If you see nothing, click its icon in the toolbar: the request may be queued behind another one.",
     readingN:"Reading real balances… ({done}/{total})",
-    walletSilent:"Your wallet never answered. Open the extension: a request is probably waiting there, or it is locked. If several wallet extensions are installed they fight over the page — keep one enabled. Then try again.",
+    walletSilent:"Your wallet did not answer the {method} request within {secs}s. Open the extension — a request may be waiting there, or it may be locked — then try again.",
+    manyWallets:" {n} wallet extensions are injecting into this page and competing for it; keep a single one enabled and reload.",
+    noProviderAnswer:" The page sees a wallet object but it answers nothing, which usually means an extension is disabled, still starting up, or blocked in this context.",
     notConnected:"No account is connected to this page, so the contracts cannot be read. Connect your wallet and try again — or use the explorer links below, which need nothing from this site.",
     chainMissing:"{name} is not configured in your wallet. Add the network, then try again.",
     chainRefused:"You declined the switch to {name}. Nothing was read.",
@@ -753,13 +756,32 @@ async function provider() {
    page. Sans borne de temps, l'interface se fige sans rien dire. */
 const RPC_MS = 20000;        // lecture silencieuse
 const PROMPT_MS = 180000;    // requête qui ouvre une fenêtre du wallet
+/* Le nom de la méthode restée sans réponse est le premier élément de
+   diagnostic : eth_accounts muet accuse le fournisseur lui-même, alors
+   qu'un wallet_switchEthereumChain muet accuse une fenêtre non vue. */
+function walletHint() {
+  const e = window.ethereum;
+  const n = e && Array.isArray(e.providers) ? e.providers.length : 0;
+  if (n > 1) return t("manyWallets", {n});
+  return t("noProviderAnswer");
+}
+/* Une requête qui ouvre une fenêtre du wallet peut légitimement durer :
+   on le dit au bout de quelques secondes plutôt que de laisser croire
+   à un blocage pendant tout le délai. */
+let statusNode = null;
+const setStatus = txt => { if (statusNode) statusNode.textContent = txt; };
+
 function ask(p, method, params, ms) {
-  let timer;
+  const limit = ms || RPC_MS;
+  let timer, slow;
+  const done = () => { clearTimeout(timer); clearTimeout(slow); };
   const req = p.request(params ? { method, params } : { method });
+  if (limit >= PROMPT_MS) slow = setTimeout(() => setStatus(t("checkWallet")), 4000);
   return Promise.race([
-    req.finally(() => clearTimeout(timer)),
+    req.finally(done),
     new Promise((_, rej) => {
-      timer = setTimeout(() => rej(new Error(t("walletSilent"))), ms || RPC_MS);
+      timer = setTimeout(() => { done(); rej(new Error(
+        t("walletSilent", {method, secs: Math.round(limit / 1000)}) + walletHint())); }, limit);
     }),
   ]);
 }
@@ -844,6 +866,7 @@ async function verifyLive(addr, chainId, retried) {
     return;
   }
   const m = message(t("connecting"), null);
+  statusNode = m;
   try {
     const before = myAddr;
     await connected();
@@ -882,7 +905,7 @@ async function verifyLive(addr, chainId, retried) {
   } catch (e) {
     m.textContent = e.message || String(e);
     m.classList.add("err"); m.classList.remove("ok");
-  }
+  } finally { statusNode = null; }
 }
 
 /* ── retrait ────────────────────────────────────────────────── */
@@ -929,6 +952,7 @@ let ackedRisk = null;   // "chaîne:adresse" dont l'utilisateur a accepté le ri
 
 async function claim(chainId, positions) {
   const m = message(t("prep"), null);
+  statusNode = m;
   try {
     const p = await provider();
     const from = "0x" + await connected();
@@ -974,7 +998,7 @@ async function claim(chainId, positions) {
     const reason = e && e.code === 4001 ? t("refused") : (e && e.message) || String(e);
     m.textContent = reason;
     m.classList.add("err"); m.classList.remove("ok");
-  }
+  } finally { statusNode = null; }
 }
 
 /* ── pourboire ──────────────────────────────────────────────── */
