@@ -50,12 +50,32 @@ button becomes "Deliver to 0x…".
 
 ## How it works
 
-1. **Search** — you paste an address. The page looks it up in an embedded snapshot.
-   No network call, no wallet, nothing to authorise.
+1. **Search** — you paste an address. The page validates its EIP-55 checksum, then
+   looks it up in an embedded snapshot. No network call, no wallet, nothing to
+   authorise.
 2. **Verify live** — an `eth_call` re-reads the real balance from the contract
    through your own wallet's RPC. Free, read-only. That figure is the one that counts.
 3. **Claim** — the page builds one transaction per protocol. Splits V1 batches every
    token on a chain into a single `withdraw` call.
+
+### Address checks
+
+**EIP-55 checksum.** A mixed-case address carries a checksum in the case of its
+letters, and the page verifies it (keccak256 is implemented inline — `SubtleCrypto`
+only offers SHA-2). A failing checksum is almost always a typo or a truncated copy,
+so the search is refused rather than run against a neighbouring address. All-lowercase
+and all-uppercase addresses claim no checksum and are accepted as-is. After a search
+the field is rewritten in canonical EIP-55 form, and addresses are displayed that way
+throughout.
+
+**Beneficiary account type.** Before a withdrawal that pays out *native ETH* — Zora,
+and the `0xEeee…EEeE` pseudo-token in Splits V1 and V2 — the page calls `eth_getCode`
+on the beneficiary. A contract with no payable `receive` function will reject the
+transfer and the transaction reverts, costing the sender gas. Contracts can hold funds
+perfectly well (a Safe or a smart account does), so this is a warning requiring a
+second click, never a block. ERC-20 withdrawals are unaffected and skip the check.
+
+Both checks run only on explicit action: nothing reaches the network while you search.
 
 ## Data
 
