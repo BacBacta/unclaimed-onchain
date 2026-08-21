@@ -386,6 +386,7 @@ const I18N = {
     noVerify:"Nothing to verify for this chain in the snapshot. Use the Etherscan method for a manual check.",
     reading:"Reading real balances…",
     connecting:"Checking your wallet…",
+    switching:"Your wallet is on another network. Asking it to switch to {name} — approve that in the extension. If no window opens, click the wallet icon in your toolbar: the request is waiting there. You can also switch to {name} yourself in the wallet, then click again.",
     checkWallet:"Waiting on your wallet — a confirmation should be open in the extension. If you see nothing, click its icon in the toolbar: the request may be queued behind another one.",
     readingN:"Reading real balances… ({done}/{total})",
     walletSilent:"Your wallet did not answer the {method} request within {secs}s. Open the extension — a request may be waiting there, or it may be locked — then try again.",
@@ -771,12 +772,13 @@ function walletHint() {
 let statusNode = null;
 const setStatus = txt => { if (statusNode) statusNode.textContent = txt; };
 
-function ask(p, method, params, ms) {
+function ask(p, method, params, ms, slowMsg) {
   const limit = ms || RPC_MS;
   let timer, slow;
   const done = () => { clearTimeout(timer); clearTimeout(slow); };
   const req = p.request(params ? { method, params } : { method });
-  if (limit >= PROMPT_MS) slow = setTimeout(() => setStatus(t("checkWallet")), 4000);
+  // slowMsg permet à l'appelant de garder un message plus précis que le générique
+  if (limit >= PROMPT_MS) slow = setTimeout(() => setStatus(slowMsg || t("checkWallet")), 4000);
   return Promise.race([
     req.finally(done),
     new Promise((_, rej) => {
@@ -807,8 +809,12 @@ async function switchChain(chainId) {
   const want = CHAIN_META[chainId].hex;
   const cur = await ask(p, "eth_chainId", [], RPC_MS);
   if (String(cur).toLowerCase() === want) return;
+  // Le changement de réseau ouvre une fenêtre qui, sous certains
+  // navigateurs, ne passe pas au premier plan : on le dit tout de suite.
+  const msg = t("switching", {name: CHAIN_META[chainId].name});
+  setStatus(msg);
   try {
-    await ask(p, "wallet_switchEthereumChain", [{ chainId: want }], PROMPT_MS);
+    await ask(p, "wallet_switchEthereumChain", [{ chainId: want }], PROMPT_MS, msg);
   } catch (e) {
     if (e && e.code === 4902) throw new Error(t("chainMissing", {name: CHAIN_META[chainId].name}));
     if (e && e.code === 4001) throw new Error(t("chainRefused", {name: CHAIN_META[chainId].name}));
