@@ -388,6 +388,7 @@ const I18N = {
     liveZero:"real balance: 0 — already claimed", liveOk:"real balance confirmed in the contract",
     readDone:"Balances re-read directly from the contracts. Those are what count.",
     kindEoa:"{addr} is a regular wallet — it can receive ETH without any doubt.",
+    kindDelegated:"{addr} is a regular wallet that delegates its code to {target} (EIP-7702). Delegates are smart-account implementations, which accept ETH — a native withdrawal goes through as usual.",
     kindContract:"{addr} is a contract, not a regular wallet. Contracts can hold funds perfectly well (a Safe or a smart account does), but one that has no payable receive function will reject an ETH transfer and the withdrawal will revert — you'd lose the gas, not the funds. Token withdrawals are unaffected.",
     riskAck:"This withdrawal sends native ETH to {addr}, which is a contract. If it cannot accept ETH the transaction will revert and you lose only the gas. Click the same button again to send anyway.",
     noWallet:"No wallet detected in this browser. Install a wallet, or use the explorer links above.",
@@ -768,9 +769,15 @@ async function accountKind(addr, chainId) {
   await switchChain(chainId);
   const code = await p.request({
     method: "eth_getCode", params: ["0x" + clean(addr), "latest"] });
-  const kind = (!code || /^0x0*$/.test(code)) ? "eoa" : "contract";
-  kindCache.set(key, kind);
-  return kind;
+  // 0xef0100||adresse : désignateur de délégation EIP-7702. Le compte reste
+  // un EOA ; son code est celui du délégué, une implémentation de smart
+  // account qui accepte l'ETH. EIP-3541 interdit tout autre code en 0xef.
+  let res;
+  if (!code || /^0x0*$/.test(code))   res = { kind: "eoa", target: null };
+  else if (/^0xef0100/i.test(code))   res = { kind: "delegated", target: "0x" + code.slice(8, 48) };
+  else                                res = { kind: "contract", target: null };
+  kindCache.set(key, res);
+  return res;
 }
 
 function balanceCall(pos, addr) {
@@ -818,10 +825,10 @@ async function verifyLive(addr, chainId) {
     try {
       for (const cid of [...new Set(targets.map(p => p.chainId))]) {
         if (!targets.some(p => p.chainId === cid && paysNative(p))) continue;
-        const kind = await accountKind(addr, cid);
-        message(t(kind === "eoa" ? "kindEoa" : "kindContract",
-                  {addr: shortAddr(addr)}),
-                kind === "eoa" ? "ok" : "warn", true);
+        const { kind, target } = await accountKind(addr, cid);
+        const label = { eoa:"kindEoa", delegated:"kindDelegated", contract:"kindContract" }[kind];
+        message(t(label, {addr: shortAddr(addr), target: target ? shortAddr(target) : ""}),
+                kind === "contract" ? "warn" : "ok", true);
       }
     } catch (_) { /* contrôle facultatif : on garde les soldes affichés */ }
   } catch (e) {
@@ -884,7 +891,7 @@ async function claim(chainId, positions) {
     // garde-fou : ETH natif vers un contrat qui pourrait le refuser
     if (positions.some(paysNative)) {
       const key = chainId + ":" + current.addr;
-      if (await accountKind(current.addr, chainId) === "contract" && ackedRisk !== key) {
+      if ((await accountKind(current.addr, chainId)).kind === "contract" && ackedRisk !== key) {
         ackedRisk = key;
         m.textContent = t("riskAck", {addr: shortAddr(current.addr)});
         m.classList.add("warn"); m.classList.remove("err", "ok");

@@ -75,6 +75,13 @@ transfer and the transaction reverts, costing the sender gas. Contracts can hold
 perfectly well (a Safe or a smart account does), so this is a warning requiring a
 second click, never a block. ERC-20 withdrawals are unaffected and skip the check.
 
+Code starting with `0xef0100` is an EIP-7702 delegation designator, not a contract:
+the account is still an EOA that has delegated its code to a smart-account
+implementation, and it accepts ETH normally. Those are reported as regular wallets
+and never gated — on a sample of native-paying Base beneficiaries they outnumbered
+real contracts, so treating them as contracts made most of the warnings wrong.
+EIP-3541 forbids any other code beginning with `0xef`, so the test is unambiguous.
+
 Both checks run only on explicit action: nothing reaches the network while you search.
 
 ## Data
