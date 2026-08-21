@@ -385,6 +385,12 @@ const I18N = {
     actNote:"You'll sign one transaction per protocol. Funds go to your address.",
     noVerify:"Nothing to verify for this chain in the snapshot. Use the Etherscan method for a manual check.",
     reading:"Reading real balances…",
+    connecting:"Checking your wallet…",
+    readingN:"Reading real balances… ({done}/{total})",
+    walletSilent:"Your wallet never answered. Open the extension: a request is probably waiting there, or it is locked. If several wallet extensions are installed they fight over the page — keep one enabled. Then try again.",
+    notConnected:"No account is connected to this page, so the contracts cannot be read. Connect your wallet and try again — or use the explorer links below, which need nothing from this site.",
+    chainMissing:"{name} is not configured in your wallet. Add the network, then try again.",
+    chainRefused:"You declined the switch to {name}. Nothing was read.",
     liveZero:"real balance: 0 — already claimed", liveOk:"real balance confirmed in the contract",
     readDone:"Balances re-read directly from the contracts. Those are what count.",
     kindEoa:"{addr} is a regular wallet — it can receive ETH without any doubt.",
@@ -741,17 +747,51 @@ async function provider() {
   if (!window.ethereum) throw new Error(t("noWallet"));
   return window.ethereum;
 }
+
+/* Une requête au wallet peut ne jamais se résoudre : extension verrouillée,
+   fenêtre restée ouverte en arrière-plan, deux wallets qui se disputent la
+   page. Sans borne de temps, l'interface se fige sans rien dire. */
+const RPC_MS = 20000;        // lecture silencieuse
+const PROMPT_MS = 180000;    // requête qui ouvre une fenêtre du wallet
+function ask(p, method, params, ms) {
+  let timer;
+  const req = p.request(params ? { method, params } : { method });
+  return Promise.race([
+    req.finally(() => clearTimeout(timer)),
+    new Promise((_, rej) => {
+      timer = setTimeout(() => rej(new Error(t("walletSilent"))), ms || RPC_MS);
+    }),
+  ]);
+}
+
+/* Lire comme envoyer exige un compte déverrouillé et connecté : sinon le
+   wallet garde la requête en attente sans jamais répondre. */
+async function connected() {
+  const p = await provider();
+  let accs = await ask(p, "eth_accounts", [], RPC_MS);
+  if (!accs || !accs.length) accs = await ask(p, "eth_requestAccounts", [], PROMPT_MS);
+  if (!accs || !accs.length) throw new Error(t("notConnected"));
+  myAddr = clean(accs[0]);
+  return myAddr;
+}
+
 async function ethCall(chainId, to, data) {
   const p = await provider();
   await switchChain(chainId);
-  return p.request({ method: "eth_call", params: [{ to, data }, "latest"] });
+  return ask(p, "eth_call", [{ to, data }, "latest"], RPC_MS);
 }
 async function switchChain(chainId) {
   const p = await provider();
   const want = CHAIN_META[chainId].hex;
-  const cur = await p.request({ method: "eth_chainId" });
-  if (cur.toLowerCase() === want) return;
-  await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: want }] });
+  const cur = await ask(p, "eth_chainId", [], RPC_MS);
+  if (String(cur).toLowerCase() === want) return;
+  try {
+    await ask(p, "wallet_switchEthereumChain", [{ chainId: want }], PROMPT_MS);
+  } catch (e) {
+    if (e && e.code === 4902) throw new Error(t("chainMissing", {name: CHAIN_META[chainId].name}));
+    if (e && e.code === 4001) throw new Error(t("chainRefused", {name: CHAIN_META[chainId].name}));
+    throw e;
+  }
 }
 
 /* ── nature du compte bénéficiaire ──────────────────────────────
@@ -767,8 +807,7 @@ async function accountKind(addr, chainId) {
   if (kindCache.has(key)) return kindCache.get(key);
   const p = await provider();
   await switchChain(chainId);
-  const code = await p.request({
-    method: "eth_getCode", params: ["0x" + clean(addr), "latest"] });
+  const code = await ask(p, "eth_getCode", ["0x" + clean(addr), "latest"], RPC_MS);
   // 0xef0100||adresse : désignateur de délégation EIP-7702. Le compte reste
   // un EOA ; son code est celui du délégué, une implémentation de smart
   // account qui accepte l'ETH. EIP-3541 interdit tout autre code en 0xef.
@@ -796,7 +835,7 @@ function balanceCall(pos, addr) {
   }
 }
 
-async function verifyLive(addr, chainId) {
+async function verifyLive(addr, chainId, retried) {
   const targets = chainId
     ? current.groups.get(chainId) || []
     : [...current.groups.values()].flat();
@@ -804,9 +843,18 @@ async function verifyLive(addr, chainId) {
     message(t("noVerify"), null);
     return;
   }
-  const m = message(t("reading"), null);
+  const m = message(t("connecting"), null);
   try {
+    const before = myAddr;
+    await connected();
+    if (myAddr !== before && !retried) {
+      // compte fraîchement connecté : réafficher avec les bons libellés, puis relire
+      lookup(current.addr);
+      return verifyLive(addr, chainId, true);
+    }
+    let done = 0;
     for (const p of targets) {
+      m.textContent = t("readingN", {done: ++done, total: targets.length});
       const { to, data } = balanceCall(p, addr);
       const raw = await ethCall(p.chainId, to, data);
       let v = BigInt(raw || "0x0");
@@ -883,9 +931,7 @@ async function claim(chainId, positions) {
   const m = message(t("prep"), null);
   try {
     const p = await provider();
-    const accounts = await p.request({ method: "eth_requestAccounts" });
-    const from = accounts[0];
-    myAddr = clean(from);
+    const from = "0x" + await connected();
     await switchChain(chainId);
 
     // garde-fou : ETH natif vers un contrat qui pourrait le refuser
@@ -906,10 +952,8 @@ async function claim(chainId, positions) {
 
     let done = 0;
     for (const tx of txs) {
-      const hash = await p.request({
-        method: "eth_sendTransaction",
-        params: [{ from, to: tx.to, data: tx.data }],
-      });
+      const hash = await ask(p, "eth_sendTransaction",
+        [{ from, to: tx.to, data: tx.data }], PROMPT_MS);
       done++;
       const link = el("div", "msg ok");
       link.appendChild(document.createTextNode(t("sent", {label: tx.label})));
@@ -944,12 +988,10 @@ document.querySelectorAll("#tip [data-tip]").forEach(b => {
     }
     try {
       const p = await provider();
-      const accounts = await p.request({ method: "eth_requestAccounts" });
+      const accounts = await ask(p, "eth_requestAccounts", [], PROMPT_MS);
       const wei = BigInt(Math.round(parseFloat(b.dataset.tip) * 1e18));
-      const hash = await p.request({
-        method: "eth_sendTransaction",
-        params: [{ from: accounts[0], to: TIP_ADDRESS, value: "0x" + wei.toString(16) }],
-      });
+      const hash = await ask(p, "eth_sendTransaction",
+        [{ from: accounts[0], to: TIP_ADDRESS, value: "0x" + wei.toString(16) }], PROMPT_MS);
       box.appendChild(el("div", "msg ok", t("thanks", {h: hash.slice(0,10)})));
     } catch (e) {
       box.appendChild(el("div", "msg", e && e.code === 4001 ? t("tipCancel") : (e && e.message) || String(e)));
@@ -1019,10 +1061,10 @@ async function sendEth(amountStr, box){
   if(!(val>0)){ box.appendChild(el("div","msg err",t("badAmt"))); return; }
   try{
     const p=await provider();
-    const acc=await p.request({method:"eth_requestAccounts"});
+    const acc=await ask(p,"eth_requestAccounts",[],PROMPT_MS);
     const wei=BigInt(Math.round(val*1e18));
-    const hash=await p.request({method:"eth_sendTransaction",
-      params:[{from:acc[0],to:TIP_ADDRESS,value:"0x"+wei.toString(16)}]});
+    const hash=await ask(p,"eth_sendTransaction",
+      [{from:acc[0],to:TIP_ADDRESS,value:"0x"+wei.toString(16)}],PROMPT_MS);
     box.appendChild(el("div","msg ok",t("thanks",{h:hash.slice(0,10)})));
   }catch(e){
     box.appendChild(el("div","msg", e&&e.code===4001
