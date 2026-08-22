@@ -177,10 +177,16 @@ $3.06M against the snapshot's $3.08M — the gap is price drift, not missing dat
 The scan added 201 positions above $0.50 (worth $1,055 in total, none above $25)
 and refreshed 2,468 amounts to their onchain values.
 
-It also found 6,970 non-zero balances across 58 tokens with no price in the
-registry's table. They are left out, since without a price they can be neither
-valued nor filtered; `v2_ethereum_onchain.csv` in the repository history lists them
-with an empty `usd` column.
+It also found 6,970 non-zero balances across 58 tokens absent from the registry's
+price table. Most of that gap is now closed: DexScreener's public API priced 14 of
+them, and 4 more were derived through their ERC-4626 vault ratio and underlying —
+863 positions worth **$168,765**, of which $168,067 is a single token, AZTEC. That
+one was cross-checked before being trusted: the Warehouse holds exactly 12,056,537
+AZTEC, matching the sum of the claims read, against $14.9M of pool liquidity.
+
+A price is only taken from a pool with at least $10,000 of liquidity, since a thin
+pool's quote is trivially manipulated. 40 tokens remain unpriced — untraded tokens,
+exotic vault shares, LP tokens — and are left out rather than guessed at.
 
 ### Known limits
 
