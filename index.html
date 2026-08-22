@@ -174,12 +174,14 @@ button[disabled]{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
 .chain-head .amt{font-family:var(--mono); font-weight:500; font-size:1rem; color:var(--cyan)}
 /* au-delà de quelques positions la liste s'étire : on la borne et on
    confine le défilement pour qu'il n'emporte pas la page entière. */
-.poslist.scroll{max-height:332px; overflow-y:auto; overscroll-behavior:contain;
+.poslist.scroll,.actlist.scroll{max-height:332px; overflow-y:auto; overscroll-behavior:contain;
   border-bottom:1px solid var(--glass-border);
   -webkit-mask-image:linear-gradient(#000 calc(100% - 26px), transparent);
           mask-image:linear-gradient(#000 calc(100% - 26px), transparent)}
-.poslist.scroll::-webkit-scrollbar{width:8px}
-.poslist.scroll::-webkit-scrollbar-thumb{background:var(--glass-border-2); border-radius:99px}
+.poslist.scroll::-webkit-scrollbar,.actlist.scroll::-webkit-scrollbar{width:8px}
+.poslist.scroll::-webkit-scrollbar-thumb,
+.actlist.scroll::-webkit-scrollbar-thumb{background:var(--glass-border-2); border-radius:99px}
+.actlist.scroll .hrow:first-of-type{border-top:0}
 .chain-head .cnt{font-family:var(--mono); font-size:11px; letter-spacing:.06em;
   text-transform:uppercase; color:var(--muted); margin-left:10px}
 #tip.spot{animation:spotlight 1.6s ease-out 1; border-color:var(--emerald)}
@@ -1793,7 +1795,13 @@ function rendreActivite(groupes, nRetraits, muettes) {
       : t("actSumNoUsd", {n: nRetraits, x: groupes.length, w: h + " h", k: gens}));
     sum.style.color = "var(--ink)";
     zone.appendChild(sum);
-    for (const g of groupes.slice(0, 40)) zone.appendChild(ligneActivite(g));
+    /* Au-delà de cinq transactions la liste poussait le reste de la page hors
+       de l'écran. Même boîte bornée que les listes de soldes : le défilement
+       reste dedans (overscroll-behavior) et un fondu marque la suite. */
+    const montrees = groupes.slice(0, 40);
+    const liste = el("div", "actlist" + (montrees.length > 5 ? " scroll" : ""));
+    for (const g of montrees) liste.appendChild(ligneActivite(g));
+    zone.appendChild(liste);
     zone.appendChild(el("p", "fine", t("actWindow", {n: groupes.length, w: h + " h"})));
   } else {
     zone.appendChild(el("p", null, t("actEmpty")));

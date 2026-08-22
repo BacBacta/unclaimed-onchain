@@ -117,6 +117,10 @@ holding 88 balances on Ethereum used to stretch the page for screens;
 `overscroll-behavior: contain` keeps that scrolling inside the box instead of
 carrying the whole page with it.
 
+The Recent activity list uses the same box past five transactions, for the same
+reason: 40 rows ran to about 2,900 pixels and pushed everything under them off
+the screen. Bounded, the whole panel is 722 pixels.
+
 After a withdrawal goes through, the support block is moved up into the results,
 directly under the confirmation, briefly highlighted and scrolled into view — it
 used to sit behind the entire position list, which on a long address put it

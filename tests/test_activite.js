@@ -82,6 +82,26 @@ async function ouvrir(page,ms=60000){
       JSON.stringify(groupees.slice(0,4)));
     check('une transaction groupée dit vers combien d\'adresses',
       groupees.length === 0 || /to \d+ addresses/.test(txt), txt.slice(0,600));
+    /* Une longue liste ne doit pas repousser le reste de la page : elle vit
+       dans une boîte bornée dont le défilement ne déborde pas. */
+    const boite = page.locator('#activitypanel .actlist');
+    check('les lignes vivent dans une liste dédiée', await boite.count() === 1);
+    const nLignes = await page.locator('#activitypanel .hrow').count();
+    if (nLignes > 5) {
+      const m = await boite.evaluate(e => {
+        const c = getComputedStyle(e);
+        return { h: e.getBoundingClientRect().height, scroll: e.scrollHeight,
+                 ovf: c.overflowY, contain: c.overscrollBehaviorY, cls: e.className };
+      });
+      check('la liste est bornée en hauteur', m.h <= 340, JSON.stringify(m));
+      check('elle défile en interne', m.ovf === 'auto' && m.scroll > m.h + 10, JSON.stringify(m));
+      check('son défilement ne gagne pas la page', m.contain === 'contain', JSON.stringify(m));
+      const avant = await page.evaluate(() => window.scrollY);
+      await boite.evaluate(e => e.scrollTop = 250);
+      check('faire défiler la boîte ne bouge pas la page',
+        (await page.evaluate(() => window.scrollY)) === avant);
+      check('elle a bien défilé', (await boite.evaluate(e => e.scrollTop)) > 100);
+    }
     check('la fenêtre de lecture est annoncée honnêtement',
       /the deepest window these public endpoints allow/.test(txt), txt.slice(-300));
     await b.close(); }
