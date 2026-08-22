@@ -245,6 +245,36 @@ const TIP_ADDRESS = "0x0000000000000000000000000000000000000000"; // ← your ad
 
 Until it is set, the tip buttons show an explicit error instead of sending anything.
 
+## Tests
+
+22 Playwright suites, ~265 assertions, driving the real `index.html` in a real
+browser — EIP-55 validation, EOA and EIP-7702 detection, the live Multicall3
+sweep and its RPC fallback, wallet detection and its failure modes, the
+withdrawal history, pricing, and the copy shown in each of them.
+
+```bash
+cd tests && npm install      # once — the site itself stays dependency-free
+node run.js --vite           # fast tier, ~35 s — between edits
+node run.js                  # everything, ~110 s — before pushing
+RAPIDE=0 node run.js         # with the page's real 20 s / 180 s deadlines
+```
+
+Two tiers, because a 35 s loop is a different kind of tool from a 110 s one.
+`--vite` is the 11 suites that finish under 35 s and cover what breaks most
+often: formatting and pricing, refusals, zero balances, the sweep, the wallet
+messages, the RPC fallback, and the network contract above. The full battery is
+what you run before pushing — it is under two minutes, so there is no excuse for
+skipping it.
+
+`RAPIDE=0` is the one to run before deploying. The page reads its four wallet
+timeouts from `window.__delais` when present, which lets the suites prove those
+bounds exist without waiting out 180 s three times over; that profile runs
+against the file exactly as shipped and is what proves the shortened ones change
+nothing.
+
+`tests/README.md` covers the conventions, the diagnostics in `tests/outils/`,
+and why the battery went from 33 minutes to under two.
+
 ## Licence
 
 MIT. See `LICENSE`.
