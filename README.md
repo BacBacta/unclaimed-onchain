@@ -91,8 +91,9 @@ EIP-3541 forbids any other code beginning with `0xef`, so the test is unambiguou
 
 ### What the page sends where
 
-The only outbound requests the page ever makes are read-only JSON-RPC `eth_call`s
-carrying the searched address, to these public endpoints: `mainnet.base.org`,
+The only outbound requests the page ever makes are read-only JSON-RPC calls to
+these public endpoints — `eth_call`s carrying the searched address, and, if you
+open the Recent activity panel, `eth_getLogs` carrying no address at all: `mainnet.base.org`,
 `*.publicnode.com`, `eth.drpc.org`, `mainnet.optimism.io` (plus Google Fonts for
 typography, loaded non-blocking). Searching an address therefore reveals it to
 those RPC operators — the same thing that happens when you look it up on any
@@ -122,6 +123,34 @@ used to sit behind the entire position list, which on a long address put it
 screens away. It returns to its own place on the next search; an anchor node
 keeps it from being destroyed when the results are cleared. No modal, no
 duplicate widget: the same block, where the eye already is.
+
+### Recent activity
+
+A **Recent activity** panel lists what the four contracts have emitted lately —
+every withdrawal, whoever sent it, read straight from the chains. It is the
+opposite of the withdrawal history below: nothing local, nothing of yours.
+
+One `eth_getLogs` per chain over the deepest window the public endpoints allow
+(10,000 blocks on Ethereum and Base, 5,000 on Optimism — about 33 hours and 5
+hours respectively), filtered to the four withdrawal events. Those signatures
+were confirmed by keccak256 and cross-checked against real logs rather than
+assumed:
+
+| Protocol | Event |
+|---|---|
+| Splits V1 | `Withdrawal(address,uint256,address[],uint256[])` |
+| Splits V2 | `Withdraw(address,address,address,uint256,uint256)` |
+| Zora | `Withdraw(address,address,uint256)` |
+| Clanker | `ClaimTokens(address,address,uint256)` |
+
+Row by row this feed reads as a column of `$0.00`, because Zora rewards are
+counted in millionths of an ETH. So it opens with what the individual lines
+hide — how many withdrawals, worth how much, to how many distinct addresses.
+A recent read: 285 withdrawals in 33 hours, delivering $50,448 to 126 people.
+
+Older activity is out of reach from a browser: these endpoints cap event
+queries at those ranges, and going further needs an indexer. The panel says so
+rather than implying it shows everything.
 
 ### Withdrawal history
 

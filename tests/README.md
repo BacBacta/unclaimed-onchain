@@ -65,7 +65,7 @@ shortened ones change nothing.
 
 ## Two tiers
 
-`--vite` runs the 11 suites that finish under 35 s and cover what breaks most
+`--vite` runs the 12 suites that finish under 35 s and cover what breaks most
 often: formatting and pricing, refusals, zero balances, the sweep, wallet
 messages, the RPC fallback, the network contract. It is what you run between
 edits. The full battery is what you run before pushing — it is under two
