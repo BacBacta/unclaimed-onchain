@@ -1,12 +1,17 @@
 {
   "name": "unclaimed-onchain-tests",
   "private": true,
-  "description": "Regression suites for index.html. The site itself has no dependencies; these do.",
+  "description": "Regression suites for index.html. The site itself has no dependencies; these do. ethers cross-checks the page's own EIP-55 implementation; jsqr and pngjs are optional and let the QR test decode what the page renders.",
   "scripts": {
     "test": "node run.js",
     "test:reel": "RAPIDE=0 node run.js"
   },
   "devDependencies": {
+    "ethers": "^6.13.0",
     "playwright": "^1.62.0"
+  },
+  "optionalDependencies": {
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0"
   }
 }

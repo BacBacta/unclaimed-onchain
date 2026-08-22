@@ -90,6 +90,9 @@ today's balance is. Keep new assertions on that side of the line.
 - Every suite reads its page from `PAGE`, defaulting to `../index.html`, so the
   battery can be pointed at any build. `run.js` also serves it over a local HTTP
   origin for the suites that want a real URL (`TEST_URL`).
+- `jsqr` and `pngjs` are optional: with them, `test_don.js` decodes the QR the
+  page renders and checks it against the link; without them that one check is
+  skipped and says so.
 - `CHROME` overrides the browser binary; unset, `run.js` finds a Chromium under
   `PLAYWRIGHT_BROWSERS_PATH`, and failing that Playwright resolves its own.
 - No suite fetches its HTML over the network. Some do call the public RPC

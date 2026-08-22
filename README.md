@@ -32,9 +32,11 @@ your own address. You never need this site.
 
 - **No token approvals.** Not one, ever. If a page asks you to approve a token to
   "release" funds, it is not this one.
-- **No seed phrase, no signature other than the withdrawal itself.**
-- **No payment to unlock anything.** The tip is optional, comes after a successful
-  withdrawal, and is a plain ETH transfer.
+- **No seed phrase, no signature other than the withdrawal itself.** That is now
+  literal: the withdrawal is the only `eth_sendTransaction` in the file. Support
+  used to be a second one, and no longer is — see below.
+- **No payment to unlock anything.** Support is optional, comes after a successful
+  withdrawal, and the page cannot send it for you.
 - **It never holds your funds.** The recipient is an argument of the contract call,
   written into an immutable contract. This site cannot redirect anything.
 
@@ -162,6 +164,30 @@ delivering $50,305 to 125 different addresses.
 Older activity is out of reach from a browser: these endpoints cap event
 queries at those ranges, and going further needs an indexer. The panel says so
 rather than implying it shows everything.
+
+### Supporting the project, without a signature
+
+The support buttons used to call `eth_sendTransaction`. That made the page ask
+for a signature that was not the withdrawal — the one exception to the guarantee
+stated above, and the wrong one to keep. They are gone.
+
+What is there instead is an address and an amount, rendered as an
+[EIP-681](https://eips.ethereum.org/EIPS/eip-681) payment URI: a QR code to scan
+from a phone, and an *Open in wallet* link to tap on the spot. Your own wallet
+builds the transfer and asks you, if you want it. This page cannot send anything
+and is never asked to.
+
+After a claim it offers the tokens you just withdrew — 1, 5 or 10 % of each, on
+the chain you withdrew on, so the gas is where you already have it. AZTEC is left
+out. The permanent block offers native ETH on Base or Ethereum.
+
+The QR is encoded in the page, because the page loads nothing from a CDN. That
+encoder is written by hand — byte mode, error correction M, versions 1 to 10 —
+and it was validated by decoding its own output with an independent
+implementation, on every payload size from 1 to 190 characters. The suite goes
+further: it screenshots the QR the page actually renders and decodes that,
+asserting it carries exactly the URI the link carries. A QR that does not decode
+is worth nothing, and nothing but decoding proves it does.
 
 ### Withdrawal history
 

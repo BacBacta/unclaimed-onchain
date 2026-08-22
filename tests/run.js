@@ -59,7 +59,7 @@ const PAGE = (() => {
    qu'on passe avant de pousser. */
 const VITE = ['test_nan', 'test_petit', 'test_prix', 'test_refus', 'test_silence',
               'test_zero', 'test_repli', 'test_sweep', 'test_msg', 'test_hang', 'test_switch',
-              'test_activite'];
+              'test_activite', 'test_don'];
 const args = process.argv.slice(2);
 const filtre = args.includes('--vite') ? VITE : args.filter(a => !a.startsWith('-'));
 const suites = fs.readdirSync(__dirname).filter(f => /^test_.*\.js$/.test(f))

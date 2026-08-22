@@ -185,6 +185,10 @@ button[disabled]{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
 .chain-head .cnt{font-family:var(--mono); font-size:11px; letter-spacing:.06em;
   text-transform:uppercase; color:var(--muted); margin-left:10px}
 #tip.spot{animation:spotlight 1.6s ease-out 1; border-color:var(--emerald)}
+.donrow{display:flex; gap:9px; flex-wrap:wrap; margin:12px 0}
+.donqr{display:inline-block; padding:12px; background:#fff; border-radius:14px; margin:6px 0}
+.donqr svg{display:block}
+#tip .fine.mono{font-family:var(--mono); font-size:11.5px; word-break:break-all; color:var(--muted)}
 @keyframes spotlight{0%{box-shadow:0 0 0 0 rgba(55,226,160,.45)}100%{box-shadow:0 0 0 16px rgba(55,226,160,0)}}
 .pos{display:grid; grid-template-columns:1fr auto; gap:3px 16px; padding:15px 22px; border-bottom:1px solid var(--glass-border); align-items:baseline}
 .pos:last-of-type{border-bottom:0}
@@ -335,15 +339,8 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
   <p class="k" data-i18n="ck">Support the project</p>
   <h3 data-i18n="ch">Buy the protocol a coffee ☕</h3>
   <p data-i18n="cp">…</p>
-  <div class="tiprow">
-    <button class="tipbtn" data-donate="0.001">☕ <span data-i18n="tCoffee">Coffee</span> <span class="amt">0,001 ETH</span></button>
-    <button class="tipbtn" data-donate="0.005">🥐 <span data-i18n="tBreak">Breakfast</span> <span class="amt">0,005 ETH</span></button>
-    <button class="tipbtn solid" data-donate="0.02">💎 <span data-i18n="tPatron">Patron</span> <span class="amt">0,02 ETH</span></button>
-  </div>
-  <div class="custom">
-    <input type="text" id="customtip" data-i18n-ph="customph" placeholder="Custom amount (ETH)" inputmode="decimal">
-    <button class="ghost small" id="customsend" data-i18n="send">Send</button>
-  </div>
+  <p class="fine" data-i18n="donHow">…</p>
+  <div id="coffeezone"></div>
   <div id="donatemsg"></div>
   <p class="foot" data-i18n="cfoot">…</p>
 </div>
@@ -352,12 +349,9 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
   <p class="k" data-i18n="tipk">Thanks for claiming</p>
   <h3 data-i18n="tiph">Was this useful?</h3>
   <p data-i18n="tipp">…</p>
-  <div class="tiprow">
-    <button class="tipbtn" data-tip="0.001">☕ <span data-i18n="tCoffee">Coffee</span> <span class="amt">0,001 ETH</span></button>
-    <button class="tipbtn" data-tip="0.005">🥐 <span data-i18n="tLunch">Lunch</span> <span class="amt">0,005 ETH</span></button>
-    <button class="tipbtn solid" data-tip="0.02">💎 <span data-i18n="tGen">Generous</span> <span class="amt">0,02 ETH</span></button>
-    <button class="ghost small" id="notip" data-i18n="notip">No thanks</button>
-  </div>
+  <p class="fine" data-i18n="donHow">…</p>
+  <div id="donzone"></div>
+  <div class="tiprow"><button class="ghost small" id="notip" data-i18n="notip">No thanks</button></div>
   <div id="tipmsg"></div>
 </div>
 
@@ -408,12 +402,10 @@ const I18N = {
     shint:"No wallet connection needed to search. You'll only connect yours when you choose to claim.",
     promise:'<b>Never a seed phrase, a token approval, or a payment to "unlock".</b> Funds always go to their owner — never to us.',
     ck:"Support the project", ch:"Buy the protocol a coffee ☕",
-    cp:"This registry is free, ad-free and open source. If it helped you — or just because you like the idea — you can leave a tip. A plain ETH transfer, no approval, cancellable anytime.",
-    tCoffee:"Coffee", tBreak:"Breakfast", tPatron:"Patron", tLunch:"Lunch", tGen:"Generous",
-    customph:"Custom amount (ETH)", send:"Send",
+    cp:"This registry is free, ad-free and open source. If it helped you — or just because you like the idea — you can send something. A plain transfer, no approval, and nothing happens until you decide it does.",
     cfoot:"The tip goes to the site's author, not to the protocols. Set the address before deploying.",
     tipk:"Thanks for claiming", tiph:"Was this useful?",
-    tipp:"If you just claimed something, a tip helps keep this service online. Entirely optional.",
+    tipp:"If you just claimed something, sending a share back keeps this online. Entirely optional, in whichever of the tokens you just withdrew.",
     notip:"No thanks",
     sec2h:"How to check this page is honest",
     sec2p:"\"You have unclaimed funds\" is the most common phishing message in the space. You're right to be wary. Here's what you need to not trust us: the four contracts involved, with the exact function you can call yourself from an explorer.",
@@ -524,8 +516,13 @@ const I18N = {
     sent:"{label} — sent. ", seeTx:"view transaction",
     sentAll:"{n} transaction(s) sent. Your funds are on the way to your address.",
     refused:"Transaction rejected in the wallet. Nothing was sent.",
+    donHow:"No signature is asked for here, and none is possible: this is only an address. Scan it with your phone, or tap Open in wallet — your own wallet builds the transfer, and you decide whether to send it.",
+    donNone:"Nothing to offer from here — this claim paid out in a token the panel does not carry.",
+    donAmount:"{amt}{usd} on {chain}",
+    donTooSmall:"That share rounds to zero at this token's precision. Pick a larger one.",
+    donOpen:"Open in wallet", donCopy:"Copy the address", donCopied:"Copied",
+    donQrAlt:"QR code of the payment request",
     noTipAddr:"Tip address not set: fill in TIP_ADDRESS at the top of the script before deploying.",
-    badAmt:"Enter a valid amount in ETH.",
     thanks:"Thank you 🙏 — transaction {h}…",
     tipCancel:"Cancelled — no worries, the service stays free.",
     v1n:"Splits V1", v2n:"Splits V2 Warehouse", zoran:"Zora Protocol Rewards", clankern:"Clanker Fee Locker",
@@ -865,6 +862,7 @@ async function liveAll(addr) {
       const k = known.get(c.proto + "|" + chainId + "|" + c.token);
       const px = prixDe(c.token);
       found.push({ proto: c.proto, chainId, token: c.token, symbol: c.symbol, amount,
+                   dec: d, brut: v.toString(),   // l'entier de la chaîne, sans passage par un flottant
                    usd: (k && k.amount > 0) ? k.usd * (amount / k.amount)
                       : (px ? amount * px : undefined) });
     });
@@ -1490,6 +1488,7 @@ async function claim(chainId, positions) {
                                     : t("sentAll", {n: done});
       m.classList.add("ok"); m.classList.remove("err");
       out.appendChild(tipBox);                 // juste sous la confirmation
+      donProposer(txs.flatMap(x => (x.pos || []).map(p => ({...p, chainId}))));
       tipBox.style.display = "block";
       tipBox.classList.add("spot");
       tipBox.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1501,27 +1500,361 @@ async function claim(chainId, positions) {
   } finally { statusNode = null; }
 }
 
-/* ── pourboire ──────────────────────────────────────────────── */
-document.querySelectorAll("#tip [data-tip]").forEach(b => {
-  b.addEventListener("click", async () => {
-    const box = document.getElementById("tipmsg");
-    box.innerHTML = "";
-    if (/^0x0{40}$/i.test(TIP_ADDRESS)) {
-      box.appendChild(el("div", "msg err", t("noTipAddr")));
-      return;
+/* ── encodeur QR ─────────────────────────────────────────────────
+   Mode octet, correction M, versions 1 à 10 — de quoi porter une URI
+   EIP-681 avec de la marge. Écrit à la main : la page n'a aucune
+   dépendance et rien ne peut être chargé depuis un CDN. Validé hors
+   ligne en décodant sa propre sortie avec une implémentation
+   indépendante, sur tous les gabarits de 1 à 190 caractères.       */
+
+/* Tables de la norme, par version, pour le niveau M :
+   [codets de données, codets de correction par bloc, blocs groupe 1, blocs groupe 2] */
+const QR_M = {
+  1:[16,10,1,0], 2:[28,16,1,0], 3:[44,26,1,0], 4:[64,18,2,0], 5:[86,24,2,0],
+  6:[108,16,4,0], 7:[124,18,4,0], 8:[154,22,2,2], 9:[182,22,3,2], 10:[216,26,4,1],
+};
+const QR_ALIGN = { 1:[], 2:[6,18], 3:[6,22], 4:[6,26], 5:[6,30], 6:[6,34],
+                   7:[6,22,38], 8:[6,24,42], 9:[6,26,46], 10:[6,28,50] };
+const QR_VINFO = { 7:0x07C94, 8:0x085BC, 9:0x09A99, 10:0x0A4D3 };
+
+/* GF(256), polynôme 0x11d */
+const GEXP = new Uint8Array(512), GLOG = new Uint8Array(256);
+(() => { let x = 1;
+  for (let i = 0; i < 255; i++) { GEXP[i] = x; GLOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11d; }
+  for (let i = 255; i < 512; i++) GEXP[i] = GEXP[i - 255]; })();
+const gmul = (a, b) => (a && b) ? GEXP[GLOG[a] + GLOG[b]] : 0;
+
+function rsPoly(n) {
+  let p = [1];
+  for (let i = 0; i < n; i++) {
+    const q = [1, GEXP[i]], r = new Array(p.length + 1).fill(0);
+    for (let a = 0; a < p.length; a++) for (let b = 0; b < 2; b++) r[a + b] ^= gmul(p[a], q[b]);
+    p = r;
+  }
+  return p;
+}
+function rsEncode(data, n) {
+  const gen = rsPoly(n), res = new Array(n).fill(0);
+  for (const d of data) {
+    const f = d ^ res[0];
+    res.shift(); res.push(0);
+    if (f) for (let i = 0; i < n; i++) res[i] ^= gmul(gen[i + 1], f);
+  }
+  return res;
+}
+
+function qrVersion(len) {
+  for (let v = 1; v <= 10; v++) {
+    const [dataCw] = QR_M[v];
+    const compte = v < 10 ? 8 : 16;
+    if (len + Math.ceil((4 + compte) / 8) <= dataCw) return v;
+  }
+  throw new Error("données trop longues pour un QR version 10");
+}
+
+function qrCodewords(octets, v) {
+  const [dataCw, ecCw, b1, b2] = QR_M[v];
+  const bits = [];
+  const push = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+  push(4, 4);                                  // mode octet
+  push(octets.length, v < 10 ? 8 : 16);
+  for (const o of octets) push(o, 8);
+  for (let i = 0; i < 4 && bits.length < dataCw * 8; i++) bits.push(0);   // terminateur
+  while (bits.length % 8) bits.push(0);
+  const cw = [];
+  for (let i = 0; i < bits.length; i += 8)
+    cw.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
+  const REMPLI = [0xEC, 0x11];
+  for (let i = 0; cw.length < dataCw; i++) cw.push(REMPLI[i % 2]);
+
+  // découpage en blocs : b1 blocs courts, b2 blocs d'un codet de plus
+  const nb = b1 + b2, court = Math.floor(dataCw / nb);
+  const blocs = [], ec = [];
+  let p = 0;
+  for (let i = 0; i < nb; i++) {
+    const taille = court + (i >= b1 ? 1 : 0);
+    const bloc = cw.slice(p, p + taille); p += taille;
+    blocs.push(bloc); ec.push(rsEncode(bloc, ecCw));
+  }
+  const sortie = [];
+  for (let i = 0; i < Math.max(...blocs.map(b => b.length)); i++)
+    for (const b of blocs) if (i < b.length) sortie.push(b[i]);
+  for (let i = 0; i < ecCw; i++) for (const e of ec) sortie.push(e[i]);
+  return sortie;
+}
+
+function qrMatrice(octets) {
+  const v = qrVersion(octets.length);
+  const n = 17 + 4 * v;
+  const m = Array.from({length: n}, () => new Array(n).fill(null));   // null = libre
+  const fixe = Array.from({length: n}, () => new Array(n).fill(false));
+  const poser = (r, c, val) => { if (r >= 0 && r < n && c >= 0 && c < n) { m[r][c] = val; fixe[r][c] = true; } };
+
+  const finder = (r0, c0) => {
+    for (let r = -1; r <= 7; r++) for (let c = -1; c <= 7; c++) {
+      const dedans = r >= 0 && r < 7 && c >= 0 && c < 7;
+      const noir = dedans && (r === 0 || r === 6 || c === 0 || c === 6 ||
+                              (r >= 2 && r <= 4 && c >= 2 && c <= 4));
+      poser(r0 + r, c0 + c, noir ? 1 : 0);
     }
-    try {
-      const p = await provider();
-      const accounts = await ask(p, "eth_requestAccounts", [], PROMPT_MS);
-      const wei = BigInt(Math.round(parseFloat(b.dataset.tip) * 1e18));
-      const hash = await ask(p, "eth_sendTransaction",
-        [{ from: accounts[0], to: TIP_ADDRESS, value: "0x" + wei.toString(16) }], PROMPT_MS);
-      box.appendChild(el("div", "msg ok", t("thanks", {h: hash.slice(0,10)})));
-    } catch (e) {
-      box.appendChild(el("div", "msg", e && e.code === 4001 ? t("tipCancel") : (e && e.message) || String(e)));
+  };
+  finder(0, 0); finder(0, n - 7); finder(n - 7, 0);
+
+  for (let i = 8; i < n - 8; i++) { poser(6, i, i % 2 === 0 ? 1 : 0); poser(i, 6, i % 2 === 0 ? 1 : 0); }
+
+  for (const r of QR_ALIGN[v]) for (const c of QR_ALIGN[v]) {
+    if ((r < 8 && c < 8) || (r < 8 && c > n - 9) || (r > n - 9 && c < 8)) continue;
+    for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++)
+      poser(r + dr, c + dc, (Math.max(Math.abs(dr), Math.abs(dc)) !== 1) ? 1 : 0);
+  }
+  poser(n - 8, 8, 1);                                  // module sombre
+
+  /* Emplacements du format, en (ligne, colonne). Les deux copies suivent la
+     norme au module près : une erreur ici rend le code illisible en entier,
+     puisque le décodeur lit le format avant tout le reste. */
+  for (const [r, c] of formatCases(n)) poser(r, c, 0);
+  if (v >= 7) for (let i = 0; i < 18; i++) {
+    const b = (QR_VINFO[v] >> i) & 1;
+    poser(Math.floor(i / 3), n - 11 + (i % 3), b);
+    poser(n - 11 + (i % 3), Math.floor(i / 3), b);
+  }
+
+  const cw = qrCodewords(octets, v);
+  const bits = [];
+  for (const c of cw) for (let i = 7; i >= 0; i--) bits.push((c >> i) & 1);
+  /* Le sens de parcours se déduit de la colonne elle-même. Le basculer à
+     chaque tour se désynchronise au saut de la colonne 6 (timing), et tout
+     ce qui suit part de travers. */
+  let bi = 0;
+  for (let col = n - 1; col >= 1; col -= 2) {
+    if (col === 6) col = 5;
+    for (let vert = 0; vert < n; vert++) {
+      for (let j = 0; j < 2; j++) {
+        const c = col - j;
+        const montant = ((col + 1) & 2) === 0;
+        const r = montant ? n - 1 - vert : vert;
+        if (!fixe[r][c]) m[r][c] = bi < bits.length ? bits[bi++] : 0;
+      }
     }
+  }
+  return { m, n, v, fixe };
+}
+
+const MASQUES = [
+  (r,c)=> (r+c)%2===0, (r,c)=> r%2===0, (r,c)=> c%3===0, (r,c)=> (r+c)%3===0,
+  (r,c)=> (Math.floor(r/2)+Math.floor(c/3))%2===0, (r,c)=> (r*c)%2+(r*c)%3===0,
+  (r,c)=> ((r*c)%2+(r*c)%3)%2===0, (r,c)=> ((r+c)%2+(r*c)%3)%2===0,
+];
+function penalite(g, n) {
+  let p = 0;
+  for (const ligne of [0, 1]) {
+    for (let a = 0; a < n; a++) {
+      let run = 1;
+      for (let b = 1; b < n; b++) {
+        const x = ligne ? g[b][a] : g[a][b], y = ligne ? g[b-1][a] : g[a][b-1];
+        if (x === y) run++; else { if (run >= 5) p += run - 2; run = 1; }
+      }
+      if (run >= 5) p += run - 2;
+    }
+  }
+  for (let r = 0; r < n-1; r++) for (let c = 0; c < n-1; c++)
+    if (g[r][c] === g[r][c+1] && g[r][c] === g[r+1][c] && g[r][c] === g[r+1][c+1]) p += 3;
+  const motif = [1,0,1,1,1,0,1,0,0,0,0];
+  for (let r = 0; r < n; r++) for (let c = 0; c + 11 <= n; c++) {
+    let ok1 = true, ok2 = true;
+    for (let i = 0; i < 11; i++) { if (g[r][c+i] !== motif[i]) ok1 = false; if (g[c+i][r] !== motif[i]) ok2 = false; }
+    if (ok1) p += 40; if (ok2) p += 40;
+    let rk1 = true, rk2 = true;
+    for (let i = 0; i < 11; i++) { if (g[r][c+i] !== motif[10-i]) rk1 = false; if (g[c+i][r] !== motif[10-i]) rk2 = false; }
+    if (rk1) p += 40; if (rk2) p += 40;
+  }
+  let noirs = 0;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) noirs += g[r][c];
+  p += Math.floor(Math.abs(noirs * 100 / (n*n) - 50) / 5) * 10;
+  return p;
+}
+/* Les 15 emplacements du format, dans l'ordre des bits 0 à 14, en deux
+   copies. Une seule liste sert à la fois à réserver et à écrire, pour que
+   les deux ne puissent pas diverger. */
+function formatCases(n) {
+  const c1 = [], c2 = [];
+  for (let i = 0; i <= 5; i++) c1.push([i, 8]);
+  c1.push([7, 8], [8, 8], [8, 7]);
+  for (let i = 9; i < 15; i++) c1.push([8, 14 - i]);
+  for (let i = 0; i < 8; i++) c2.push([8, n - 1 - i]);      // ligne 8, à droite
+  for (let i = 8; i < 15; i++) c2.push([n - 15 + i, 8]);   // colonne 8, en bas
+  return { c1, c2, [Symbol.iterator]: function* () { yield* c1; yield* c2; } };
+}
+function formatBits(masque) {
+  const d = (0 << 3) | masque;               // niveau M = 00
+  let rem = d;
+  for (let i = 0; i < 10; i++) rem = (rem << 1) ^ (((rem >>> 9) & 1) * 0x537);
+  return ((d << 10) | (rem & 0x3ff)) ^ 0x5412;
+}
+function qrEncode(texte) {
+  const octets = Array.from(new TextEncoder().encode(texte));
+  const { m, n, fixe } = qrMatrice(octets);
+  let best = null;
+  for (let k = 0; k < 8; k++) {
+    const g = m.map((ligne, r) => ligne.map((val, c) =>
+      fixe[r][c] ? val : (val ^ (MASQUES[k](r, c) ? 1 : 0))));
+    const f = formatBits(k), cases = formatCases(n);
+    for (let i = 0; i < 15; i++) {
+      const b = (f >> i) & 1;
+      const [r1, x1] = cases.c1[i]; g[r1][x1] = b;
+      const [r2, x2] = cases.c2[i]; g[r2][x2] = b;
+    }
+    g[n - 8][8] = 1;                          // module sombre, toujours
+    const p = penalite(g, n);
+    if (!best || p < best.p) best = { g, p, k };
+  }
+  return { modules: best.g, taille: n };
+}
+/* ── dons : QR et lien, jamais de signature demandée ─────────────
+   Le bouton de pourboire appelait eth_sendTransaction, donc le site
+   demandait une signature qui n'était pas le retrait — la seule
+   entorse à la garantie que le README affirme. Il n'en demande plus
+   aucune : on affiche une URI EIP-681, en QR pour la scanner depuis
+   un téléphone et en lien pour l'ouvrir sur place. C'est le wallet
+   de la personne qui construit la transaction, pas cette page.   */
+const AZTEC = "a27ec0006e59f245217ff08cd52a7e8b169e62d2";   // exclu des dons
+const DON_PARTS = [1, 5, 10];                                 // en % du retrait
+
+function qrSvg(texte, cote = 168) {
+  const { modules, taille } = qrEncode(texte);
+  const marge = 4, n = taille + marge * 2;
+  let d = "";
+  for (let r = 0; r < taille; r++) for (let c = 0; c < taille; c++)
+    if (modules[r][c]) d += `M${c + marge} ${r + marge}h1v1h-1z`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${n} ${n}`);
+  svg.setAttribute("width", cote); svg.setAttribute("height", cote);
+  svg.setAttribute("shape-rendering", "crispEdges");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", t("donQrAlt"));
+  const fond = document.createElementNS(svg.namespaceURI, "rect");
+  fond.setAttribute("width", n); fond.setAttribute("height", n); fond.setAttribute("fill", "#fff");
+  const chemin = document.createElementNS(svg.namespaceURI, "path");
+  chemin.setAttribute("d", d); chemin.setAttribute("fill", "#000");
+  svg.appendChild(fond); svg.appendChild(chemin);
+  return svg;
+}
+
+/* EIP-681. Un montant entier en unités de base : pas de flottant dans
+   l'URI, sinon un wallet arrondit ce que personne n'a demandé. */
+function uriPaiement(p, brut) {
+  const dest = TIP_ADDRESS.toLowerCase();
+  return clean(p.token) === NATIVE
+    ? `ethereum:${dest}@${p.chainId}?value=${brut}`
+    : `ethereum:0x${clean(p.token)}@${p.chainId}/transfer?address=${dest}&uint256=${brut}`;
+}
+/* Repli quand aucune valeur brute n'est connue (montants fixes). On passe par
+   une écriture décimale à précision limitée : toFixed(18) sur un flottant
+   ramène le bruit binaire dans les derniers chiffres. */
+const brutDe = (montant, dec) => {
+  const s = montant.toPrecision(15).includes("e")
+    ? montant.toFixed(Math.min(dec, 18))
+    : String(Number(montant.toPrecision(15)));
+  const [e, f = ""] = s.split(".");
+  const frac = (f + "0".repeat(dec)).slice(0, dec);
+  return (BigInt(e) * 10n ** BigInt(dec) + BigInt(frac || "0")).toString();
+};
+
+/* Deux entrées, un seul mécanisme : après un retrait on propose une part de
+   ce qui vient d'être retiré ; le bloc de soutien permanent propose des
+   montants fixes en ETH. Ni l'un ni l'autre n'appelle le wallet. */
+const DON_FIXES = [0.001, 0.005, 0.02];
+const donEtats = new Map();
+function donRendre(id) {
+  const zone = document.getElementById(id), etat = donEtats.get(id);
+  if (!zone || !etat) return;
+  zone.innerHTML = "";
+  const { choix, pos, idx, mode } = etat;
+  if (!choix.length || !pos) { zone.appendChild(el("p", "fine", t("donNone"))); return; }
+
+  if (choix.length > 1) {
+    const ligneJetons = el("div", "donrow jetons");
+    for (const q of choix) {
+      const b = el("button", "tipbtn" + (q === pos ? " solid" : ""),
+        q.symbol + " · " + CHAIN_META[q.chainId].name);
+      b.addEventListener("click", () => { etat.pos = q; donRendre(id); });
+      ligneJetons.appendChild(b);
+    }
+    zone.appendChild(ligneJetons);
+  }
+
+  /* Une part se calcule sur l'entier de la chaîne, pas sur le flottant
+     d'affichage : 10 % de 0,4 ETH passait par 0.04000000000000001 et
+     l'URI demandait un wei de trop. */
+  const options = mode === "part"
+    ? DON_PARTS.map(q => ({ lib: q + " %", montant: pos.amount * q / 100,
+        brut: pos.brut !== undefined ? (BigInt(pos.brut) * BigInt(q) / 100n).toString() : null }))
+    : DON_FIXES.map(v => ({ lib: fmtAmt(v) + " " + pos.symbol, montant: v, brut: null }));
+  const ligneParts = el("div", "donrow montants");
+  options.forEach((o, i) => {
+    const b = el("button", "tipbtn" + (i === idx ? " solid" : ""), o.lib);
+    b.addEventListener("click", () => { etat.idx = i; donRendre(id); });
+    ligneParts.appendChild(b);
   });
+  zone.appendChild(ligneParts);
+
+  const opt = options[Math.min(idx, options.length - 1)];
+  const montant = opt.montant;
+  const dec = Number.isFinite(pos.dec) ? pos.dec : 18;
+  const brut = opt.brut !== null ? opt.brut : brutDe(montant, dec);
+  if (BigInt(brut) <= 0n) { zone.appendChild(el("p", "fine", t("donTooSmall"))); return; }
+  const uri = uriPaiement(pos, brut);
+
+  const px = prixDe(pos.token);
+  zone.appendChild(el("p", null, t("donAmount", {
+    amt: fmtAmt(montant) + " " + pos.symbol,
+    usd: px ? " (" + fmtUSD(montant * px) + ")" : "",
+    chain: CHAIN_META[pos.chainId].name })));
+
+  const boite = el("div", "donqr");
+  boite.appendChild(qrSvg(uri));
+  zone.appendChild(boite);
+
+  const acts = el("div", "donrow actions");
+  const ouvrir = el("a", "tipbtn solid", t("donOpen"));
+  ouvrir.href = uri;                       // le wallet prend la main, pas nous
+  acts.appendChild(ouvrir);
+  const copier = el("button", "ghost small", t("donCopy"));
+  copier.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(TIP_ADDRESS); copier.textContent = t("donCopied"); }
+    catch (e) { copier.textContent = TIP_ADDRESS; }
+  });
+  acts.appendChild(copier);
+  zone.appendChild(acts);
+  zone.appendChild(el("p", "fine mono", TIP_ADDRESS));
+}
+
+/* Ce que la personne vient de retirer, hors AZTEC, dédoublonné. */
+function donProposer(positions) {
+  const vus = new Set(), choix = [];
+  for (const p of positions || []) {
+    if (!p || !(p.amount > 0)) continue;
+    if (clean(p.token) === AZTEC) continue;
+    const k = p.chainId + "|" + clean(p.token);
+    if (vus.has(k)) continue;
+    vus.add(k); choix.push(p);
+  }
+  donEtats.set("donzone", { choix, pos: choix[0] || null, idx: 0, mode: "part" });
+  donRendre("donzone");
+}
+
+/* Le bloc permanent : rien n'a été retiré, donc de l'ETH natif, sur la
+   chaîne la moins chère d'abord. */
+donEtats.set("coffeezone", {
+  choix: [8453, 1].map(chainId => ({ chainId, token: NATIVE, symbol: "ETH", amount: 0, dec: 18 })),
+  pos: null, idx: 0, mode: "fixe",
 });
+donEtats.get("coffeezone").pos = donEtats.get("coffeezone").choix[0];
+donRendre("coffeezone");
+
+/* ── pourboire ──────────────────────────────────────────────── */
+/* Il n'y a plus rien à câbler ici : le panneau est rendu par donProposer()
+   au moment où un retrait aboutit, et n'appelle jamais le wallet. */
 document.getElementById("notip").addEventListener("click", () => {
   tipBox.style.display = "none";
 });
@@ -1575,33 +1908,8 @@ if (q) { document.getElementById("addr").value = q; lookup(q); }
 })();
 
 /* ── dons (toujours disponibles) ─────────────────────────────── */
-async function sendEth(amountStr, box){
-  box.innerHTML="";
-  if(/^0x0{40}$/i.test(TIP_ADDRESS)){
-    box.appendChild(el("div","msg err",t("noTipAddr")));
-    return;
-  }
-  const val=parseFloat(String(amountStr).replace(",","."));
-  if(!(val>0)){ box.appendChild(el("div","msg err",t("badAmt"))); return; }
-  try{
-    const p=await provider();
-    const acc=await ask(p,"eth_requestAccounts",[],PROMPT_MS);
-    const wei=BigInt(Math.round(val*1e18));
-    const hash=await ask(p,"eth_sendTransaction",
-      [{from:acc[0],to:TIP_ADDRESS,value:"0x"+wei.toString(16)}],PROMPT_MS);
-    box.appendChild(el("div","msg ok",t("thanks",{h:hash.slice(0,10)})));
-  }catch(e){
-    box.appendChild(el("div","msg", e&&e.code===4001
-      ? t("tipCancel") : (e&&e.message)||String(e)));
-  }
-}
-document.querySelectorAll("#coffee [data-donate]").forEach(b=>
-  b.addEventListener("click",()=>sendEth(b.dataset.donate,document.getElementById("donatemsg"))));
-document.getElementById("customsend").addEventListener("click",()=>
-  sendEth(document.getElementById("customtip").value,document.getElementById("donatemsg")));
-document.getElementById("customtip").addEventListener("keydown",e=>{
-  if(e.key==="Enter") sendEth(e.target.value,document.getElementById("donatemsg"));
-});
+/* sendEth et le champ de montant libre ont disparu avec lui : plus aucune
+   signature n'est demandée pour un don, seul le retrait en demande une. */
 document.getElementById("supportlink").addEventListener("click",()=>
   document.getElementById("coffee").scrollIntoView({behavior:"smooth",block:"start"}));
 /* ── activité récente des protocoles ─────────────────────────────
