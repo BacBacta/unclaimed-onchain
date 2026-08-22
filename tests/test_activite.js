@@ -66,7 +66,22 @@ async function ouvrir(page,ms=60000){
       JSON.stringify(liens.slice(0,3)));
     check('les protocoles sont nommés', /Splits V[12]|Zora|Clanker/.test(txt), txt.slice(0,300));
     check('une synthèse porte le signal que les lignes seules cachent',
-      /withdrawals in the last \d+ h/.test(txt) && /different addresses/.test(txt), txt.slice(0,400));
+      /withdrawals in \d+ transactions over the last \d+ h/.test(txt)
+      && /different addresses/.test(txt), txt.slice(0,400));
+    /* Une transaction émet souvent des dizaines de retraits : le panneau doit
+       montrer une ligne par transaction, jamais deux lignes pour la même. */
+    const txLiens = await page.locator('#activitypanel .hrow a').evaluateAll(a=>a.map(x=>x.href));
+    check('une ligne par transaction, aucun doublon',
+      new Set(txLiens).size === txLiens.length, `${txLiens.length} lignes, ${new Set(txLiens).size} tx distinctes`);
+    const sum = txt.match(/(\d+) withdrawals in (\d+) transactions/);
+    check('la synthèse compte plus de retraits que de transactions',
+      sum && Number(sum[1]) >= Number(sum[2]), sum ? sum[0] : txt.slice(0,200));
+    const groupees = amts.filter(a=>/^\d+ withdrawals$/.test(a.trim()));
+    check('les transactions groupées annoncent leur nombre de retraits',
+      groupees.length === 0 || groupees.every(a=>Number(a.trim().split(' ')[0])>1),
+      JSON.stringify(groupees.slice(0,4)));
+    check('une transaction groupée dit vers combien d\'adresses',
+      groupees.length === 0 || /to \d+ addresses/.test(txt), txt.slice(0,600));
     check('la fenêtre de lecture est annoncée honnêtement',
       /the deepest window these public endpoints allow/.test(txt), txt.slice(-300));
     await b.close(); }

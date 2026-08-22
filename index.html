@@ -504,10 +504,12 @@ const I18N = {
     actLoading:"Reading the chains…",
     actEmpty:"No withdrawal in the window read. That happens: these are quiet contracts for hours at a time.",
     actDown:"The chains could not be read just now — {names} did not answer. Nothing is wrong with your address; this panel needs public endpoints that accept event queries.",
-    actWindow:"Showing {n} withdrawal(s) over the last {w} — the deepest window these public endpoints allow. Older ones need an indexer, or the explorer links above.",
+    actWindow:"Showing {n} transaction(s) over the last {w} — the deepest window these public endpoints allow. Older ones need an indexer, or the explorer links above.",
     actRefresh:"Refresh",
-    actSum:"{n} withdrawals in the last {w}, delivering {usd} to {k} different addresses.",
-    actSumNoUsd:"{n} withdrawals in the last {w}, to {k} different addresses.",
+    actSum:"{n} withdrawals in {x} transactions over the last {w}, delivering {usd} to {k} different addresses.",
+    actSumNoUsd:"{n} withdrawals in {x} transactions over the last {w}, to {k} different addresses.",
+    actMany:"{n} withdrawals",
+    actToOne:"to {addr}", actToMany:"to {k} addresses",
     actClaim:"claimed by {addr}",
     actAgo:"{n} min ago", actAgoH:"{n} h ago", actNow:"just now",
     histSent:"sent", histOk:"confirmed", histKo:"reverted",
@@ -1725,8 +1727,22 @@ async function chargerActivite() {
     } catch (e) { muettes.push(CHAIN_META[chainId].name); }
   }));
   if (seq !== actSeq) return;
-  lignes.sort((a, b) => b.t - a.t || b.bloc - a.bloc);
-  rendreActivite(lignes, muettes);
+  /* Une transaction émet souvent des dizaines de retraits — 195 événements
+     pour 27 transactions sur Ethereum, mesuré. Une ligne par événement donne
+     un flux illisible qui répète la même action ; on regroupe par
+     transaction, ce qui est aussi l'unité que l'explorateur montre. */
+  const parTx = new Map();
+  for (const r of lignes) {
+    let g = parTx.get(r.tx);
+    if (!g) { g = { tx: r.tx, chainId: r.chainId, bloc: r.bloc, t: r.t, n: 0, usd: 0,
+                    prix: false, gens: new Set(), protos: new Set(), seule: null };
+              parTx.set(r.tx, g); }
+    g.n++; g.gens.add(r.addr); g.protos.add(r.proto);
+    if (Number.isFinite(r.usd)) { g.usd += r.usd; g.prix = true; }
+    g.seule = g.n === 1 ? r : null;
+  }
+  const groupes = [...parTx.values()].sort((a, b) => b.t - a.t || b.bloc - a.bloc);
+  rendreActivite(groupes, lignes.length, muettes);
 }
 
 function ilYA(ms) {
@@ -1736,20 +1752,26 @@ function ilYA(ms) {
   return t("actAgoH", {n: Math.round(min / 60)});
 }
 
-function ligneActivite(r) {
+function ligneActivite(g) {
   const row = el("div", "hrow");
-  row.appendChild(el("div", "amt", fmtAmt(r.montant) + " " + r.symbole));
-  row.appendChild(el("span", "usdlite", Number.isFinite(r.usd) ? fmtUSD(r.usd) : ""));
+  // une transaction à un seul retrait garde son montant ; sinon, le compte
+  row.appendChild(el("div", "amt", g.seule
+    ? fmtAmt(g.seule.montant) + " " + g.seule.symbole
+    : t("actMany", {n: g.n})));
+  row.appendChild(el("span", "usdlite", g.prix ? fmtUSD(g.usd) : ""));
   const a = el("a", null, t("histSeeTx"));
-  a.href = CHAIN_META[r.chainId].scan + "/tx/" + r.tx;
+  a.href = CHAIN_META[g.chainId].scan + "/tx/" + g.tx;
   a.target = "_blank"; a.rel = "noopener noreferrer";
   row.appendChild(a);
-  row.appendChild(el("div", "meta", [PROTO_NOM[r.proto], CHAIN_META[r.chainId].name,
-    t("actClaim", {addr: shortAddr(r.addr)}), ilYA(r.t)].join("  ·  ")));
+  const vers = g.gens.size === 1
+    ? t("actToOne", {addr: shortAddr([...g.gens][0])})
+    : t("actToMany", {k: g.gens.size});
+  row.appendChild(el("div", "meta", [[...g.protos].map(p => PROTO_NOM[p]).join(" + "),
+    CHAIN_META[g.chainId].name, vers, ilYA(g.t)].join("  ·  ")));
   return row;
 }
 
-function rendreActivite(lignes, muettes) {
+function rendreActivite(groupes, nRetraits, muettes) {
   const panel = document.getElementById("activitypanel");
   const ouvert = !panel.hidden;
   panel.innerHTML = "";
@@ -1758,21 +1780,21 @@ function rendreActivite(lignes, muettes) {
   card.appendChild(el("p", null, t("actP")));
   card.appendChild(el("p", "fine", t("actFine")));
   const zone = el("div", "actzone");
-  if (lignes.length) {
+  if (groupes.length) {
     /* Ligne par ligne, ce flux est une colonne de « $0.00 » : les récompenses
        Zora se comptent en millionièmes d'ETH. Le total et le nombre de
        bénéficiaires distincts disent ce que chaque ligne prise seule cache —
        que les contrats travaillent en continu. */
     const h = Math.round(Math.max(...CHAINS.map(c => ACT_SPAN[c] * ACT_BLOCK_S[c])) / 3600);
-    const usd = lignes.reduce((a, r) => a + (Number.isFinite(r.usd) ? r.usd : 0), 0);
-    const gens = new Set(lignes.map(r => r.addr)).size;
+    const usd = groupes.reduce((a, g) => a + g.usd, 0);
+    const gens = new Set(groupes.flatMap(g => [...g.gens])).size;
     const sum = el("p", null, usd > 0
-      ? t("actSum", {n: lignes.length, w: h + " h", usd: fmtUSD(usd), k: gens})
-      : t("actSumNoUsd", {n: lignes.length, w: h + " h", k: gens}));
+      ? t("actSum", {n: nRetraits, x: groupes.length, w: h + " h", usd: fmtUSD(usd), k: gens})
+      : t("actSumNoUsd", {n: nRetraits, x: groupes.length, w: h + " h", k: gens}));
     sum.style.color = "var(--ink)";
     zone.appendChild(sum);
-    for (const r of lignes.slice(0, 40)) zone.appendChild(ligneActivite(r));
-    zone.appendChild(el("p", "fine", t("actWindow", {n: lignes.length, w: h + " h"})));
+    for (const g of groupes.slice(0, 40)) zone.appendChild(ligneActivite(g));
+    zone.appendChild(el("p", "fine", t("actWindow", {n: groupes.length, w: h + " h"})));
   } else {
     zone.appendChild(el("p", null, t("actEmpty")));
   }

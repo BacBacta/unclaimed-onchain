@@ -143,10 +143,17 @@ assumed:
 | Zora | `Withdraw(address,address,uint256)` |
 | Clanker | `ClaimTokens(address,address,uint256)` |
 
-Row by row this feed reads as a column of `$0.00`, because Zora rewards are
+**One row per transaction, not per event.** A single transaction routinely emits
+dozens of withdrawal events — 195 events across 27 transactions on Ethereum, in
+one measured window — so a row per event repeats the same action until the feed
+is unreadable. Events are grouped by transaction hash, which is also the unit
+the explorer shows: a transaction that paid out once shows its amount, one that
+paid out eight times says so and names how many addresses it reached.
+
+Row by row this feed still reads as a column of `$0.00`, because Zora rewards are
 counted in millionths of an ETH. So it opens with what the individual lines
-hide — how many withdrawals, worth how much, to how many distinct addresses.
-A recent read: 285 withdrawals in 33 hours, delivering $50,448 to 126 people.
+hide: a recent read was 283 withdrawals in 91 transactions over 33 hours,
+delivering $50,305 to 125 different addresses.
 
 Older activity is out of reach from a browser: these endpoints cap event
 queries at those ranges, and going further needs an indexer. The panel says so
