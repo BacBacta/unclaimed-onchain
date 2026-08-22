@@ -99,6 +99,21 @@ the same thing that happens when you look it up on any block explorer. Nothing e
 is sent to anyone: no analytics, no backend of ours. The wallet is only touched on
 explicit action, and only ever for the withdrawal itself.
 
+### Interface
+
+Past six balances on one chain, the list moves into a bounded, scrollable box
+with the count in the header and a fade marking the continuation. An address
+holding 88 balances on Ethereum used to stretch the page for screens;
+`overscroll-behavior: contain` keeps that scrolling inside the box instead of
+carrying the whole page with it.
+
+After a withdrawal goes through, the support block is moved up into the results,
+directly under the confirmation, briefly highlighted and scrolled into view — it
+used to sit behind the entire position list, which on a long address put it
+screens away. It returns to its own place on the next search; an anchor node
+keeps it from being destroyed when the results are cleared. No modal, no
+duplicate widget: the same block, where the eye already is.
+
 ### Withdrawal history
 
 Transaction hashes used to appear once and vanish on reload. A **Withdrawals**

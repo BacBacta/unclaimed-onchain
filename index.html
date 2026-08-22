@@ -162,6 +162,18 @@ button[disabled]{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
 .chain-head{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:17px 22px; border-bottom:1px solid var(--glass-border)}
 .chain-head h3{font-family:var(--display); font-weight:700; font-size:1.1rem; margin:0; letter-spacing:-.01em}
 .chain-head .amt{font-family:var(--mono); font-weight:500; font-size:1rem; color:var(--cyan)}
+/* au-delà de quelques positions la liste s'étire : on la borne et on
+   confine le défilement pour qu'il n'emporte pas la page entière. */
+.poslist.scroll{max-height:332px; overflow-y:auto; overscroll-behavior:contain;
+  border-bottom:1px solid var(--glass-border);
+  -webkit-mask-image:linear-gradient(#000 calc(100% - 26px), transparent);
+          mask-image:linear-gradient(#000 calc(100% - 26px), transparent)}
+.poslist.scroll::-webkit-scrollbar{width:8px}
+.poslist.scroll::-webkit-scrollbar-thumb{background:var(--glass-border-2); border-radius:99px}
+.chain-head .cnt{font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); margin-left:10px}
+#tip.spot{animation:spotlight 1.6s ease-out 1; border-color:var(--emerald)}
+@keyframes spotlight{0%{box-shadow:0 0 0 0 rgba(55,226,160,.45)}100%{box-shadow:0 0 0 16px rgba(55,226,160,0)}}
 .pos{display:grid; grid-template-columns:1fr auto; gap:3px 16px; padding:15px 22px; border-bottom:1px solid var(--glass-border); align-items:baseline}
 .pos:last-of-type{border-bottom:0}
 .pos .tok{font-weight:600; font-size:15px}
@@ -447,6 +459,7 @@ const I18N = {
     noWallet:"No wallet detected in this browser. Install a wallet, or use the explorer links above.",
     noWalletShort:"No wallet in this browser — use the contract links below to claim yourself.",
     openExplorer:"Claim on the explorer:",
+    nBalances:"{n} balances",
     deliverH:"You're delivering someone else's funds",
     deliverP:"This address isn't the one connected ({you}). That's fine — these contracts let anyone trigger a withdrawal. You pay the gas, {them} receives the funds. Nothing can come to you.",
     deliverTo:"Deliver to {addr}",
@@ -670,6 +683,16 @@ const shortAddr = a => {
 };
 const out  = document.getElementById("out");
 const tipBox = document.getElementById("tip");
+/* Après un retrait, le bloc de soutien est remonté juste sous le message de
+   confirmation — là où le regard se trouve — puis remis à sa place à la
+   recherche suivante, avant que #out ne soit vidé.                        */
+const tipAncre = document.createComment("tip");
+tipBox.parentNode.insertBefore(tipAncre, tipBox);
+function tipRemettre() {
+  tipBox.classList.remove("spot");
+  if (tipBox.parentElement !== tipAncre.parentElement)
+    tipAncre.parentNode.insertBefore(tipBox, tipAncre.nextSibling);
+}
 
 function message(text, kind, keep) {
   if (!keep) out.querySelectorAll(".msg.status").forEach(n => n.remove());
@@ -699,6 +722,7 @@ function explorerUrl(proto, chainId) {
 function lookup(addrRaw) {
   const status = checksumStatus(addrRaw);   // avant clean() : la casse porte le checksum
   const addr = clean(String(addrRaw).trim());
+  tipRemettre();                            // ne pas le détruire avec le contenu de #out
   out.innerHTML = "";
   tipBox.style.display = "none";
 
@@ -876,9 +900,12 @@ function render(total, live) {
     const head = el("div", "chain-head");
     head.appendChild(el("h3", null, meta.name));
     head.appendChild(el("div", "amt", fmtUSD(sommeUsd(positions))));
+    if (positions.length > 6) head.querySelector("h3").appendChild(
+      el("span", "cnt", t("nBalances", {n: positions.length})));
     box.appendChild(head);
 
-    positions.sort((a, b) => b.usd - a.usd);
+    positions.sort((a, b) => (b.usd || 0) - (a.usd || 0));
+    const liste = el("div", "poslist" + (positions.length > 6 ? " scroll" : ""));
     for (const p of positions) {
       const row = el("div", "pos");
       row.appendChild(el("div", "tok", fmtAmt(p.amount) + " " + p.symbol));
@@ -888,8 +915,9 @@ function render(total, live) {
       const live = el("div", "live"); live.dataset.live = p.proto + ":" + p.token;
       if (p.stale) { live.textContent = t("staleMark"); live.style.color = "var(--warn)"; }
       row.appendChild(live);
-      box.appendChild(row);
+      liste.appendChild(row);
     }
+    box.appendChild(liste);
 
     const act = el("div", "chain-act");
     if (hasWallet()) {
@@ -1395,8 +1423,10 @@ async function claim(chainId, positions) {
       m.textContent = isDelivery() ? t("sentAllDeliver", {n: done, addr: shortAddr(current.addr)})
                                     : t("sentAll", {n: done});
       m.classList.add("ok"); m.classList.remove("err");
+      out.appendChild(tipBox);                 // juste sous la confirmation
       tipBox.style.display = "block";
-      tipBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      tipBox.classList.add("spot");
+      tipBox.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   } catch (e) {
     const reason = e && e.code === 4001 ? t("refused") : (e && e.message) || String(e);
