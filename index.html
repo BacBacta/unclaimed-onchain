@@ -635,8 +635,8 @@ const fmtUSD = n => "$" + (n >= 1000 ? Math.round(n).toLocaleString("en-US") : n
 const fmtAmt = n => {
   if (n === 0) return "0";
   if (n < 0.0001) return n.toExponential(2);
-  if (n < 1) return n.toFixed(6).replace(/0+$/, "");
-  if (n < 1000) return n.toFixed(4).replace(/0+$/, "");
+  if (n < 1) return n.toFixed(6).replace(/\.?0+$/, "");
+  if (n < 1000) return n.toFixed(4).replace(/\.?0+$/, "");
   return Math.round(n).toLocaleString("en-US");
 };
 const el = (tag, cls, txt) => {
@@ -653,7 +653,7 @@ function countUp(node, target) {
   const dur = 900, t0 = performance.now();
   function step(now) {
     if (node.dataset.hold) return;      // une valeur réelle a pris la main
-    const k = Math.min(1, (now - t0) / dur);
+    const k = Math.max(0, Math.min(1, (now - t0) / dur));   // jamais négatif : sinon le montant s'affiche en négatif
     const e = 1 - Math.pow(1 - k, 3);           // easeOutCubic
     node.textContent = fmtUSD(target * e);
     if (k < 1) requestAnimationFrame(step);
@@ -769,6 +769,27 @@ function snapGroups(addr) {
   }
   return groups;
 }
+/* Prix médian de chaque jeton, déduit de l'ensemble de l'instantané.
+   Sans cela, un solde relu en direct n'était valorisé que si CETTE
+   adresse-là figurait déjà dans l'instantané pour ce jeton : une position
+   sous le seuil s'affichait à $0.00 alors que le prix était connu par
+   ailleurs. Calculé une fois, à la première recherche.                  */
+let prixJeton = null;
+function prixDe(token) {
+  if (!prixJeton) {
+    const acc = new Map();
+    for (const rows of Object.values(SNAP.a))
+      for (const [pi, ci, ti, amt, usd] of rows)
+        if (amt > 0 && usd > 0) {
+          const k = SNAP.t[ti][0];
+          if (!acc.has(k)) acc.set(k, []);
+          acc.get(k).push(usd / amt);
+        }
+    prixJeton = new Map();
+    for (const [k, v] of acc) { v.sort((a, b) => a - b); prixJeton.set(k, v[v.length >> 1]); }
+  }
+  return prixJeton.get(clean(token));
+}
 const sommeUsd = arr => arr.reduce((s, p) => s + (p.usd || 0), 0);
 const totalUsd = groups => [...groups.values()].reduce((s, a) => s + sommeUsd(a), 0);
 
@@ -812,8 +833,10 @@ async function liveAll(addr) {
       const d = clean(c.token) === NATIVE ? 18 : dec[clean(c.token)];
       const amount = Number(v) / 10 ** d;
       const k = known.get(c.proto + "|" + chainId + "|" + c.token);
+      const px = prixDe(c.token);
       found.push({ proto: c.proto, chainId, token: c.token, symbol: c.symbol, amount,
-                   usd: (k && k.amount > 0) ? k.usd * (amount / k.amount) : undefined });
+                   usd: (k && k.amount > 0) ? k.usd * (amount / k.amount)
+                      : (px ? amount * px : undefined) });
     });
     if (found.length) groups.set(chainId, found); else groups.delete(chainId);
   }
