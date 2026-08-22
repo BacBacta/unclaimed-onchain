@@ -599,7 +599,7 @@ let myAddr = null;       // compte connecté, en minuscules, sans 0x
 async function refreshAccount(prompt) {
   if (!hasWallet()) return null;
   try {
-    const accs = await window.ethereum.request({
+    const accs = await pickProvider().request({
       method: prompt ? "eth_requestAccounts" : "eth_accounts" });
     myAddr = accs && accs[0] ? clean(accs[0]) : null;
   } catch (e) { myAddr = null; }
@@ -621,7 +621,19 @@ function message(text, kind, keep) {
   m.scrollIntoView({ behavior: "smooth", block: "nearest" });
   return m;
 }
-const hasWallet = () => typeof window !== "undefined" && !!window.ethereum;
+/* ── détection du wallet ────────────────────────────────────────
+   window.ethereum peut être injecté APRÈS ce script : l'extension et
+   la page sont en course, et le perdant varie selon le navigateur.
+   Les wallets modernes s'annoncent aussi via EIP-6963. On écoute les
+   deux, et on réagit à une apparition tardive plutôt que de conclure
+   une fois pour toutes qu'il n'y a pas de wallet.                  */
+const announced = [];
+function pickProvider() {
+  if (typeof window === "undefined") return null;
+  if (window.ethereum) return window.ethereum;       // choix de l'utilisateur s'il en a plusieurs
+  return announced.length ? announced[0].provider : null;
+}
+const hasWallet = () => !!pickProvider();
 function explorerUrl(proto, chainId) {
   return CHAIN_META[chainId].scan + "/address/" + C[proto] + "#writeContract";
 }
@@ -754,8 +766,9 @@ function render(total) {
 
 /* ── lecture en direct via le wallet ────────────────────────── */
 async function provider() {
-  if (!window.ethereum) throw new Error(t("noWallet"));
-  return window.ethereum;
+  const p = pickProvider();
+  if (!p) throw new Error(t("noWallet"));
+  return p;
 }
 
 /* Une requête au wallet peut ne jamais se résoudre : extension verrouillée,
@@ -767,7 +780,7 @@ const PROMPT_MS = 180000;    // requête qui ouvre une fenêtre du wallet
    diagnostic : eth_accounts muet accuse le fournisseur lui-même, alors
    qu'un wallet_switchEthereumChain muet accuse une fenêtre non vue. */
 function walletHint() {
-  const e = window.ethereum;
+  const e = pickProvider();
   const n = e && Array.isArray(e.providers) ? e.providers.length : 0;
   if (n > 1) return t("manyWallets", {n});
   return t("noProviderAnswer");
@@ -1278,13 +1291,37 @@ document.getElementById("supportlink").addEventListener("click",()=>
 
 applyLang();
 
-/* ── compte connecté ─────────────────────────────────────────── */
-if (hasWallet()) {
-  refreshAccount(false).then(() => { if (current) lookup(current.addr); });
-  if (window.ethereum.on) window.ethereum.on("accountsChanged", accs => {
+/* ── compte connecté, dès que le wallet se manifeste ─────────── */
+let walletReady = false;
+function onWalletAppeared() {
+  if (walletReady || !hasWallet()) return;
+  walletReady = true;
+  const host = document.getElementById("walletbanner");
+  if (host) host.innerHTML = "";            // le bandeau « aucun wallet » n'a plus lieu d'être
+  const p = pickProvider();
+  if (p && p.on) p.on("accountsChanged", accs => {
     myAddr = accs && accs[0] ? clean(accs[0]) : null;
-    if (current) lookup(current.addr);
+    if (current && current.addr) lookup(current.addr);
   });
+  // re-rendre : une recherche faite avant l'injection n'avait aucun bouton
+  refreshAccount(false).then(() => { if (current && current.addr) lookup(current.addr); });
+}
+
+window.addEventListener("eip6963:announceProvider", ev => {
+  const d = ev && ev.detail;
+  if (!d || !d.provider || announced.some(a => a.provider === d.provider)) return;
+  announced.push(d);
+  onWalletAppeared();
+});
+try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (e) {}
+
+onWalletAppeared();
+if (!walletReady) {                          // laisser à l'extension le temps de s'injecter
+  let tries = 0;
+  const poll = setInterval(() => {
+    onWalletAppeared();
+    if (walletReady || ++tries > 40) clearInterval(poll);
+  }, 250);
 }
 
 /* ── bandeau si aucun wallet ─────────────────────────────────── */
