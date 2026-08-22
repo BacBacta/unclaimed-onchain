@@ -420,6 +420,10 @@ const I18N = {
     giftP:"Every withdraw function here is permissionless: you can pay the gas to deliver someone else's forgotten money. On Base it costs a fraction of a cent. Paste any address from the report and hit deliver.",
     bannerH:"No wallet detected",
     bannerP:"You can still search and see what you're owed. To claim, either open this page in a browser with a wallet extension, or use the contract links shown with your results — they take you straight to the withdraw function on the block explorer.",
+    bannerMobileH:"Open this page inside your wallet's browser",
+    bannerMobileP:"Mobile browsers have no wallet extensions — there is nothing for this page to detect. A mobile wallet only exposes itself inside its own built-in browser. Tap your wallet below to reopen this exact page there, and everything works: search, verify, claim.",
+    bannerMobileP2:"No wallet app? The contract links shown with your results still work — they open the withdraw function on the block explorer, where you can claim by hand.",
+    openIn:"Open in:",
     bannerPreview:"Heads-up: this preview runs in a sandbox that blocks wallet extensions. Search works fully; claiming requires opening the page on its own domain.",
     prep:"Preparing…",
     toSign:"{n} transaction(s) to sign. Funds will go to {addr}, whoever signs.",
@@ -1325,6 +1329,20 @@ if (!walletReady) {                          // laisser à l'extension le temps 
 }
 
 /* ── bandeau si aucun wallet ─────────────────────────────────── */
+/* Sur mobile il n'existe pas d'extension : un wallet ne s'injecte que
+   dans son propre navigateur intégré. Attendre ne sert à rien, il faut
+   rouvrir la page là-bas — c'est ce que font ces liens profonds.     */
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+function walletDeepLinks() {
+  const href = location.href, hostPath = location.host + location.pathname + location.search;
+  return [
+    ["MetaMask", "https://metamask.app.link/dapp/" + hostPath],
+    ["Coinbase Wallet", "https://go.cb-w.com/dapp?cb_url=" + encodeURIComponent(href)],
+    ["Trust", "https://link.trustwallet.com/open_url?coin_id=60&url=" + encodeURIComponent(href)],
+    ["Phantom", "https://phantom.app/ul/browse/" + encodeURIComponent(href)
+                + "?ref=" + encodeURIComponent(location.origin)],
+  ];
+}
 (function(){
   if (hasWallet()) return;
   const inFrame = (()=>{ try { return window.self !== window.top; } catch(e){ return true; } })();
@@ -1332,8 +1350,20 @@ if (!walletReady) {                          // laisser à l'extension le temps 
   const b = el("div","glass edge banner");
   const ico = el("div","ico","!"); b.appendChild(ico);
   const body = document.createElement("div");
-  body.appendChild(el("h4",null,t("bannerH")));
-  body.appendChild(el("p",null,t("bannerP")));
+  body.appendChild(el("h4",null,t(IS_MOBILE ? "bannerMobileH" : "bannerH")));
+  body.appendChild(el("p",null,t(IS_MOBILE ? "bannerMobileP" : "bannerP")));
+  if (IS_MOBILE) {
+    const links = el("div","explorers");
+    links.style.padding = "12px 0 4px";
+    links.appendChild(el("span","lbl",t("openIn")));
+    for (const [nom, url] of walletDeepLinks()) {
+      const a = el("a","explink",nom);
+      a.href = url; a.rel = "noopener noreferrer";
+      links.appendChild(a);
+    }
+    body.appendChild(links);
+    body.appendChild(el("p",null,t("bannerMobileP2")));
+  }
   if (inFrame) body.appendChild(el("p",null,t("bannerPreview")));
   b.appendChild(body);
   host.appendChild(b);

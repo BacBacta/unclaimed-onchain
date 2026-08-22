@@ -84,6 +84,19 @@ EIP-3541 forbids any other code beginning with `0xef`, so the test is unambiguou
 
 Both checks run only on explicit action: nothing reaches the network while you search.
 
+### Wallets
+
+Detection listens for EIP-6963 announcements and keeps watching `window.ethereum`
+for ten seconds, because the extension and the page race to load and the loser
+varies by browser. When a wallet turns up late, the banner goes away and any
+search already on screen re-renders with its buttons — no reload needed.
+
+On mobile there is nothing to wait for: mobile browsers have no extensions, and a
+wallet only injects a provider inside its own built-in browser. The banner says so
+and offers deep links that reopen the same page in MetaMask, Coinbase Wallet,
+Trust or Phantom. They are plain links — nothing is fetched from those hosts
+unless you tap one.
+
 ## Data
 
 The embedded snapshot was built from onchain events (via Dune) plus a state read
