@@ -1,14 +1,28 @@
 const { chromium } = require('playwright');
+const { totalStable } = require('./aide');
 const fs=require('fs');
 const html=fs.readFileSync(process.env.PAGE || require('path').join(__dirname, '..', 'index.html'),'utf8');
 const VIDE='0x7229BaceEb5ed0ba32e862FF794C59C1950c926a';        // retiré : solde réel 0
 const PLEIN='0x6BAb38eD8e3c942DCC287bE471D651055B615c7E';        // encore crédité
 const BASE=['https://mainnet.base.org','https://base-rpc.publicnode.com'];
 let fails=0; const check=(l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};
-async function rpc(m,p){let e;for(const u of BASE){try{
- const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json','User-Agent':'curl/8.5.0'},
-  body:JSON.stringify({jsonrpc:'2.0',id:1,method:m,params:p})});
- const j=await r.json(); if(j.result!==undefined)return j.result; if(j.error)e=j.error;}catch(x){e=x}}
+/* La passerelle relaie les eth_call du wallet simulé vers les RPC publics de
+   Base. Sans réessai, une limitation de débit — fréquente quand toute la
+   batterie sollicite les mêmes endpoints en parallèle — faisait échouer la
+   lecture DU TEST, pas de la page, et l'assertion « total inchangé » cassait
+   au hasard. Trois tours avec attente croissante suffisent. */
+let relais = 0, relaisEchecs = 0;
+async function rpc(m,p){
+ let e;
+ for(let tour=0; tour<3; tour++){
+  for(const u of BASE){try{
+   const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json','User-Agent':'curl/8.5.0'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method:m,params:p})});
+   const j=await r.json(); if(j.result!==undefined){relais++; return j.result;} if(j.error)e=j.error;}catch(x){e=x}}
+  await new Promise(r=>setTimeout(r, 300*(tour+1)));
+ }
+ relaisEchecs++;
+ console.log('  \u26a0 passerelle RPC en échec sur ' + m + ' : ' + ((e&&e.message)||e));
  throw new Error(m);}
 
 async function open(){
@@ -39,7 +53,7 @@ async function verifier(page, addr){
   await page.waitForTimeout(800);
   return {avant, apres:await page.locator('#out').innerText()};
 }
-const grandTotal = p => p.locator('#out .total .big').innerText();
+const grandTotal = p => totalStable(p);
 const lead = p => p.locator('#out .total .lead').innerText();
 
 (async()=>{
@@ -56,13 +70,12 @@ const lead = p => p.locator('#out .total .lead').innerText();
   console.log('\nB — adresse encore créditée : rien ne doit changer');
   { const {b,page}=await open();
     await page.fill('#addr',PLEIN); await page.click('#go');
-    /* 900 ms attrapait le total pendant le balayage automatique et son
-       animation : la comparaison portait alors sur un chiffre transitoire.
-       On attend que le direct se soit posé avant de prendre la référence. */
+    /* 900 ms attrapait le total pendant le balayage automatique : la
+       comparaison portait alors sur un chiffre transitoire. On attend que le
+       direct se soit posé, puis totalStable() attend la fin de l'animation. */
     { const t=Date.now(); let x='';
       while(Date.now()-t<45000){ x=await page.locator('#out').innerText().catch(()=> '');
         if(/re-read live|not re-read|Nothing/.test(x)) break; await page.waitForTimeout(150); } }
-    await page.waitForTimeout(1100);   // laisser l'animation du total se terminer
     const totalAvant=await grandTotal(page);
     await page.locator('#out button',{hasText:'Verify live'}).first().click();
     const t0=Date.now(); let apres='';
@@ -104,6 +117,7 @@ const lead = p => p.locator('#out .total .lead').innerText();
     check('aucun message d\'historique', !/already sent a withdrawal/.test(await page.locator('#out').innerText()));
     await b.close(); }
 
+  if (relaisEchecs) console.log(`\n  (passerelle : ${relaisEchecs} échec(s) sur ${relais+relaisEchecs} appels)`);
   console.log(fails===0?'\nTOUS LES TESTS PASSENT':`\n${fails} ÉCHEC(S)`);
   process.exit(fails===0?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(1);});

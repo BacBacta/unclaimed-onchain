@@ -93,11 +93,20 @@ EIP-3541 forbids any other code beginning with `0xef`, so the test is unambiguou
 
 The only outbound requests the page ever makes are read-only JSON-RPC `eth_call`s
 carrying the searched address, to these public endpoints: `mainnet.base.org`,
-`*.publicnode.com`, `cloudflare-eth.com`, `mainnet.optimism.io` (plus Google Fonts
-for typography). Searching an address therefore reveals it to those RPC operators —
-the same thing that happens when you look it up on any block explorer. Nothing else
-is sent to anyone: no analytics, no backend of ours. The wallet is only touched on
-explicit action, and only ever for the withdrawal itself.
+`*.publicnode.com`, `eth.drpc.org`, `mainnet.optimism.io` (plus Google Fonts for
+typography, loaded non-blocking). Searching an address therefore reveals it to
+those RPC operators — the same thing that happens when you look it up on any
+block explorer. Each chain lists two, and the second is only called if the first
+fails, so a search normally reaches exactly one operator. Nothing else is sent to
+anyone: no analytics, no backend of ours. The wallet is only touched on explicit
+action, and only ever for the withdrawal itself.
+
+`cloudflare-eth.com` was the second Ethereum endpoint until Cloudflare retired
+its public gateway: it still answers HTTP 200 and refuses every call, so Ethereum
+had no fallback left at all. The page never gave a wrong answer for it — a failed
+live read leaves the snapshot figures on screen, marked as not re-read — but the
+safety net was gone. `eth.drpc.org` replaces it, verified against the real 61 KB
+Multicall3 payload the page sends.
 
 ### Interface
 

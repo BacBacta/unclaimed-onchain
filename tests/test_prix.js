@@ -1,8 +1,9 @@
 const { chromium } = require('playwright');
+const { totalStable } = require('./aide');
 const fs=require('fs');
 const A='0xB56847BB0B29789f306c86A5c1c9B1BBE493A7aE';   // 35 AZTEC ≈ 0,49 $, sous le seuil
 const HOSTS=['https://mainnet.base.org','https://base-rpc.publicnode.com',
- 'https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com',
+ 'https://ethereum-rpc.publicnode.com','https://eth.drpc.org',
  'https://mainnet.optimism.io','https://optimism-rpc.publicnode.com'];
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'POST,OPTIONS'};
 let fails=0; const check=(l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};
@@ -31,7 +32,7 @@ async function essai(html,label){
     fmt: Object.fromEntries([0, 1, 35, 100, 35.5, 0.5, 0.018594, 1234.5].map(n => [String(n), fmtAmt(n)])),
   })).catch(() => ({}));
   const r={...sonde, txt,
-    total:await page.locator('#out .total .big').innerText().catch(()=>'?'),
+    total:await totalStable(page),
     sous:await page.locator('#out .chain-head .amt').allInnerTexts().catch(()=>[]),
     tok:await page.locator('#out .pos .tok').allInnerTexts().catch(()=>[]),
     usd:await page.locator('#out .pos .usd').allInnerTexts().catch(()=>[])};

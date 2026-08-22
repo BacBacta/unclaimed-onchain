@@ -9,7 +9,7 @@ async function essai(html){
   const page=await b.newPage();
   await page.route('https://bacbacta.github.io/**',r=>r.fulfill({status:200,contentType:'text/html; charset=utf-8',body:html}));
   await page.route('**fonts.g**',r=>r.abort());
-  await page.route(u=>/publicnode|base\.org|cloudflare-eth|optimism\.io|mevblocker|drpc/.test(u.href),
+  await page.route(u=>/publicnode|base\.org|optimism\.io|mevblocker|drpc/.test(u.href),
     r=>r.fulfill({status:200,headers:{'Access-Control-Allow-Origin':'*','Content-Type':'application/json'},body:'{"error":{"message":"hors ligne"}}'}));
   await page.goto('https://bacbacta.github.io/unclaimed-onchain/',{waitUntil:'load'});
   await page.waitForTimeout(900);

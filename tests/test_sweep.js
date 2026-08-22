@@ -4,7 +4,7 @@ const html = fs.readFileSync(process.env.PAGE || require('path').join(__dirname,
 const VITALIK='d8da6bf26964af9d7eed9e03e53415d37aa96045';
 const SIGNER='0x000000000000000000000000000000000000bEEF';
 const HOSTS=['https://mainnet.base.org','https://base-rpc.publicnode.com',
-  'https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com',
+  'https://ethereum-rpc.publicnode.com','https://eth.drpc.org',
   'https://mainnet.optimism.io','https://optimism-rpc.publicnode.com'];
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type',
             'Access-Control-Allow-Methods':'POST,OPTIONS'};

@@ -5,7 +5,7 @@ const A='0xdc8c831d1E90C00973466531c080d63B2Ae38578';
 const AZ='a27ec0006e59f245217ff08cd52a7e8b169e62d2';
 const SIGNER='0x000000000000000000000000000000000000bEEF';
 const HOSTS=['https://mainnet.base.org','https://base-rpc.publicnode.com',
- 'https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com',
+ 'https://ethereum-rpc.publicnode.com','https://eth.drpc.org',
  'https://mainnet.optimism.io','https://optimism-rpc.publicnode.com'];
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'POST,OPTIONS'};
 let fails=0; const check=(l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};

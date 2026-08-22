@@ -1100,8 +1100,14 @@ const MC3 = "0xca11bde05977b3631167028862be2a173976ca11";
 /* Lecture publique, sans wallet : les mêmes eth_call, adressés à des
    RPC ouverts. C'est ce qui permet de relire les vrais soldes
    automatiquement après chaque recherche.                            */
+/* Le second endpoint n'est appelé que si le premier échoue (pubCall rend la
+   main au premier succès), donc cette liste dit aussi combien d'opérateurs
+   peuvent voir une adresse recherchée : deux au pire, un en temps normal.
+   cloudflare-eth.com y figurait mais Cloudflare a retiré sa passerelle
+   publique : elle répond 200 et refuse tous les appels. Ethereum n'avait
+   donc plus de repli du tout. */
 const PUB_RPC = {
-  1:    ["https://ethereum-rpc.publicnode.com", "https://cloudflare-eth.com"],
+  1:    ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org"],
   8453: ["https://mainnet.base.org", "https://base-rpc.publicnode.com"],
   10:   ["https://mainnet.optimism.io", "https://optimism-rpc.publicnode.com"],
 };

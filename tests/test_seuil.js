@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const { totalStable } = require('./aide');
 const fs=require('fs');
 const html=fs.readFileSync(process.env.PAGE || require('path').join(__dirname, '..', 'index.html'),'utf8');
 const VITALIK='0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';  // DANS l'instantané, 1 position ≥25$
@@ -6,7 +7,7 @@ const VIDE='0x7229BaceEb5ed0ba32e862FF794C59C1950c926a';
 const PLEIN='0x6BAb38eD8e3c942DCC287bE471D651055B615c7E';
 const INCONNUE='0xd3d5ba1BF2A6De742beF4Ac47961FC07Bd86ff47';
 const HOSTS=['https://mainnet.base.org','https://base-rpc.publicnode.com',
- 'https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com',
+ 'https://ethereum-rpc.publicnode.com','https://eth.drpc.org',
  'https://mainnet.optimism.io','https://optimism-rpc.publicnode.com'];
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'POST,OPTIONS'};
 let fails=0; const check=(l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};
@@ -61,15 +62,15 @@ async function chercher(page,a,re,ms=60000){
   console.log('\nB — adresse retirée : toujours $0.00 et « Already claimed »');
   { const {b,page}=await open();
     const txt=await chercher(page,VIDE,/Already claimed|Nothing is waiting/);
-    check('total à $0.00', (await page.locator('#out .total .big').innerText())==='$0.00');
+    check('total à $0.00', (await totalStable(page))==='$0.00');
     check('message explicite', /Nothing is waiting for this address any more/.test(txt), txt.slice(-300));
     await b.close(); }
 
   console.log('\nC — adresse encore créditée : montants et prix conservés');
   { const {b,page}=await open();
     const txt=await chercher(page,PLEIN,/re-read live/);
-    check('total non nul', (await page.locator('#out .total .big').innerText())!=='$0.00',
-      await page.locator('#out .total .big').innerText());
+    check('total non nul', (await totalStable(page))!=='$0.00',
+      await totalStable(page));
     check('valorisation en dollars conservée', /\$1[0-9],[0-9]{3}/.test(txt), txt.slice(0,300));
     await b.close(); }
 
@@ -90,7 +91,7 @@ async function chercher(page,a,re,ms=60000){
     await b.close(); }
 
   console.log('\nF — une seule chaîne injoignable : ses positions restent, signalées');
-  { const {b,page}=await open({down:['https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com']});
+  { const {b,page}=await open({down:['https://ethereum-rpc.publicnode.com','https://eth.drpc.org']});
     const txt=await chercher(page,PLEIN,/not re-read/);
     check('Ethereum signalé non relu', /not re-read — Ethereum unreachable/.test(txt), txt.slice(-300));
     check('les positions Base sont bien relues', /re-read live|live ✓|\$/.test(txt));

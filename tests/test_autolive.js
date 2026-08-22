@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const { totalStable } = require('./aide');
 const fs = require('fs');
 const html = fs.readFileSync(process.env.PAGE || require('path').join(__dirname, '..', 'index.html'),'utf8');
 const VIDE='0x7229BaceEb5ed0ba32e862FF794C59C1950c926a';
@@ -6,7 +7,7 @@ const PLEIN='0x6BAb38eD8e3c942DCC287bE471D651055B615c7E';
 const VITALIK='d8da6bf26964af9d7eed9e03e53415d37aa96045';
 const INCONNUE='0xd3d5ba1BF2A6De742beF4Ac47961FC07Bd86ff47';
 const HOSTS=['https://mainnet.base.org','https://base-rpc.publicnode.com',
-  'https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com',
+  'https://ethereum-rpc.publicnode.com','https://eth.drpc.org',
   'https://mainnet.optimism.io','https://optimism-rpc.publicnode.com'];
 let fails=0; const check=(l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type',
@@ -56,8 +57,8 @@ async function waitFor(page, re, ms=30000){
     const txt=await waitFor(page,/Already claimed/i);   // .lead est rendu en majuscules
     check('état « déjà réclamé » atteint sans aucun clic', /Nothing is waiting for this address any more/.test(txt), txt.slice(-300));
     check('total ramené à $0.00 automatiquement',
-      (await page.locator('#out .total .big').innerText())==='$0.00',
-      await page.locator('#out .total .big').innerText());
+      (await totalStable(page))==='$0.00',
+      await totalStable(page));
     check('intitulé « Already claimed »', /Already claimed/i.test(await page.locator('#out .total .lead').innerText()));
     check('légende : chiffres relus en direct',
       /re-read live from the contracts just now/.test(await page.locator('#out .total .cap').innerText()),
@@ -71,7 +72,7 @@ async function waitFor(page, re, ms=30000){
     await page.fill('#addr',PLEIN); await page.click('#go');
     const txt=await waitFor(page,/re-read live from the contracts/);
     check('relecture automatique effectuée', /re-read live from the contracts just now/.test(txt), txt.slice(-300));
-    check('total non nul conservé', (await page.locator('#out .total .big').innerText())!=='$0.00');
+    check('total non nul conservé', (await totalStable(page))!=='$0.00');
     check('légende passée en direct', /just now/.test(await page.locator('#out .total .cap').innerText()));
     await b.close(); }
 
@@ -98,8 +99,8 @@ async function waitFor(page, re, ms=30000){
   { const {b,page,rpcHits}=await open({mode:'down'});
     await page.fill('#addr',VIDE); await page.click('#go');
     await page.waitForTimeout(4000);
-    check('total de l\'instantané conservé', /\$4[45]/.test(await page.locator('#out .total .big').innerText()),
-      await page.locator('#out .total .big').innerText());
+    check('total de l\'instantané conservé', /\$4[45]/.test(await totalStable(page)),
+      await totalStable(page));
     check('légende le dit : relecture injoignable',
       /live check unreachable/.test(await page.locator('#out .total .cap').innerText()),
       await page.locator('#out .total .cap').innerText());
@@ -114,7 +115,7 @@ async function waitFor(page, re, ms=30000){
     await page.waitForTimeout(600);
     check('aucun bouton de retrait : il n\'y a plus rien à livrer',
       (await page.locator('#out button',{hasText:'Deliver to'}).count())===0);
-    check('total à zéro affiché', (await page.locator('#out .total .big').innerText())==='$0.00');
+    check('total à zéro affiché', (await totalStable(page))==='$0.00');
     await page.locator('#out').screenshot({path:'auto-live.png'});
     await b.close(); }
 

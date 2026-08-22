@@ -118,7 +118,15 @@ async function servir() {
     console.log(`\n${ko.length} SUITE(S) EN ÉCHEC\n`);
     for (const r of ko) {
       console.log('══ ' + r.f + ' ' + '═'.repeat(40));
-      console.log(r.out.split('\n').filter(l => /FAIL|FATAL|ÉCHEC/.test(l)).slice(0, 20).join('\n'));
+      /* la ligne suivant un FAIL porte le détail de l'assertion : sans elle
+         le rapport dit qu'un test a cassé sans dire avec quelles valeurs */
+      const lignes = r.out.split('\n');
+      const garder = new Set();
+      lignes.forEach((l, i) => {
+        if (/FAIL|FATAL|ÉCHEC|⚠/.test(l)) { garder.add(i); garder.add(i + 1); garder.add(i + 2); }
+      });
+      console.log([...garder].sort((a, b) => a - b).slice(0, 40)
+        .map(i => lignes[i]).filter(l => l !== undefined && l !== '').join('\n'));
     }
     if (srv) srv.close();
     process.exit(1);

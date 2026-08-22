@@ -4,7 +4,7 @@ const html=fs.readFileSync(process.env.PAGE || require('path').join(__dirname, '
 const PETIT='0x01b5060790D6e7574f487d8E545ce793aFe6a800';   // ~0,90 $ sur Base (forme EIP-55 exacte)
 const GROS='0x72B1202c820e4B2F8ac9573188B638866C7D9274';    // 507 k$, doit être intact
 const HOSTS=['https://mainnet.base.org','https://base-rpc.publicnode.com',
- 'https://ethereum-rpc.publicnode.com','https://cloudflare-eth.com',
+ 'https://ethereum-rpc.publicnode.com','https://eth.drpc.org',
  'https://mainnet.optimism.io','https://optimism-rpc.publicnode.com'];
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'POST,OPTIONS'};
 let fails=0; const check=(l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};

@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
         throw new Error('stub'); } };
   });
   const AUTORISES = ['mainnet.base.org','base-rpc.publicnode.com','ethereum-rpc.publicnode.com',
-    'cloudflare-eth.com','mainnet.optimism.io','optimism-rpc.publicnode.com'];
+    'eth.drpc.org','mainnet.optimism.io','optimism-rpc.publicnode.com'];
   const interdites = [];
   page.on('request', r => {
     const u = new URL(r.url());
