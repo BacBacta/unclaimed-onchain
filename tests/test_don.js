@@ -127,7 +127,42 @@ async function open(){
       JSON.stringify(await page.evaluate(()=>window.__erreurs)));
     await b.close(); }
 
-  console.log('\nC — le retrait reste la seule signature demandée');
+  console.log('\nC — montant libre');
+  { const {b,page,envoyees}=await open();
+    const champ=page.locator('#coffeezone .donlibre');
+    check('le champ existe et annonce le jeton', (await champ.getAttribute('placeholder'))==='Other (ETH)');
+    await champ.click();
+    await champ.type('0.123', {delay: 40});
+    await page.waitForTimeout(250);
+    check('le champ garde le focus pendant la frappe',
+      await page.evaluate(()=>document.activeElement && document.activeElement.className==='donlibre'));
+    check('la valeur saisie est conservée', (await champ.inputValue())==='0.123');
+    let lien=await page.locator('#coffeezone a').first().getAttribute('href');
+    check('le lien suit le montant libre', /@8453\?value=123000000000000000$/.test(lien), lien);
+    const solides=await page.locator('#coffeezone .donrow.montants button.solid').count();
+    check('les paliers se désélectionnent', solides===0, 'solides='+solides);
+
+    await champ.fill('0,25');
+    await page.waitForTimeout(200);
+    lien=await page.locator('#coffeezone a').first().getAttribute('href');
+    check('la virgule décimale est acceptée', /value=250000000000000000$/.test(lien), lien);
+
+    await champ.fill('abc');
+    await page.waitForTimeout(200);
+    check('une saisie invalide ne produit pas de QR',
+      (await page.locator('#coffeezone .donqr').count())===0);
+    check('et le dit', /rounds to zero|Pick a larger/.test(await page.locator('#coffeezone').innerText()),
+      await page.locator('#coffeezone').innerText());
+
+    await champ.fill('');
+    await page.waitForTimeout(200);
+    check('vider le champ redonne le palier sélectionné',
+      /value=1000000000000000$/.test(await page.locator('#coffeezone a').first().getAttribute('href')),
+      await page.locator('#coffeezone a').first().getAttribute('href'));
+    check('toujours aucune transaction', envoyees.length===0, JSON.stringify(envoyees));
+    await b.close(); }
+
+  console.log('\nD — le retrait reste la seule signature demandée');
   { const {b,page,envoyees}=await open();
     const src = await page.evaluate(() => document.documentElement.outerHTML);
     const n = (src.match(/ask\(\s*p\s*,\s*"eth_sendTransaction"/g) || []).length;

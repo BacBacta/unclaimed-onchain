@@ -177,9 +177,14 @@ from a phone, and an *Open in wallet* link to tap on the spot. Your own wallet
 builds the transfer and asks you, if you want it. This page cannot send anything
 and is never asked to.
 
-After a claim it offers the tokens you just withdrew — 1, 5 or 10 % of each, on
-the chain you withdrew on, so the gas is where you already have it. AZTEC is left
-out. The permanent block offers native ETH on Base or Ethereum.
+After a claim it offers the tokens you just withdrew — 1, 5 or 10 % of each, or
+any amount you type, on the chain you withdrew on, so the gas is where you
+already have it. AZTEC is left out. The permanent block offers native ETH on
+Base or Ethereum.
+
+Typing an amount re-renders only the QR and the link, not the panel around them:
+rebuilding the whole thing on each keystroke would take the focus out of the
+field being typed into.
 
 The QR is encoded in the page, because the page loads nothing from a CDN. That
 encoder is written by hand — byte mode, error correction M, versions 1 to 10 —

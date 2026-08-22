@@ -186,8 +186,21 @@ button[disabled]{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
   text-transform:uppercase; color:var(--muted); margin-left:10px}
 #tip.spot{animation:spotlight 1.6s ease-out 1; border-color:var(--emerald)}
 .donrow{display:flex; gap:9px; flex-wrap:wrap; margin:12px 0}
-.donqr{display:inline-block; padding:12px; background:#fff; border-radius:14px; margin:6px 0}
+.donqr{padding:10px; background:#fff; border-radius:12px; flex:0 0 auto}
+.donout{display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin-top:14px}
+.dondetails{flex:1 1 260px; min-width:0}
 .donqr svg{display:block}
+.donlibre{width:118px; padding:9px 13px; border-radius:999px; font:inherit; font-size:13px;
+  background:var(--bg-3); color:var(--ink); border:1px solid var(--glass-border)}
+.donlibre:focus{outline:none; border-color:var(--cyan)}
+/* Sur un écran étroit les puces se cassaient en trois lignes : on les serre
+   plutôt que d'en retirer, et le champ libre prend la largeur restante. */
+@media (max-width:480px){
+  .donrow{gap:7px; margin:9px 0}
+  .donrow .tipbtn{padding:8px 12px; font-size:12.5px}
+  .donlibre{flex:1 1 96px; width:auto; min-width:0; padding:8px 12px; font-size:12.5px}
+}
+.donamt{margin:0 0 10px}
 #tip .fine.mono{font-family:var(--mono); font-size:11.5px; word-break:break-all; color:var(--muted)}
 @keyframes spotlight{0%{box-shadow:0 0 0 0 rgba(55,226,160,.45)}100%{box-shadow:0 0 0 16px rgba(55,226,160,0)}}
 .pos{display:grid; grid-template-columns:1fr auto; gap:3px 16px; padding:15px 22px; border-bottom:1px solid var(--glass-border); align-items:baseline}
@@ -402,10 +415,10 @@ const I18N = {
     shint:"No wallet connection needed to search. You'll only connect yours when you choose to claim.",
     promise:'<b>Never a seed phrase, a token approval, or a payment to "unlock".</b> Funds always go to their owner — never to us.',
     ck:"Support the project", ch:"Buy the protocol a coffee ☕",
-    cp:"This registry is free, ad-free and open source. If it helped you — or just because you like the idea — you can send something. A plain transfer, no approval, and nothing happens until you decide it does.",
-    cfoot:"The tip goes to the site's author, not to the protocols. Set the address before deploying.",
+    cp:"Free, ad-free, open source. If it helped, send what you like.",
+    cfoot:"Goes to the site's author, not to the protocols.",
     tipk:"Thanks for claiming", tiph:"Was this useful?",
-    tipp:"If you just claimed something, sending a share back keeps this online. Entirely optional, in whichever of the tokens you just withdrew.",
+    tipp:"Optional — a share of any token you just withdrew.",
     notip:"No thanks",
     sec2h:"How to check this page is honest",
     sec2p:"\"You have unclaimed funds\" is the most common phishing message in the space. You're right to be wary. Here's what you need to not trust us: the four contracts involved, with the exact function you can call yourself from an explorer.",
@@ -516,11 +529,12 @@ const I18N = {
     sent:"{label} — sent. ", seeTx:"view transaction",
     sentAll:"{n} transaction(s) sent. Your funds are on the way to your address.",
     refused:"Transaction rejected in the wallet. Nothing was sent.",
-    donHow:"No signature is asked for here, and none is possible: this is only an address. Scan it with your phone, or tap Open in wallet — your own wallet builds the transfer, and you decide whether to send it.",
+    donHow:"No signature — just an address. Scan it, or open it in your wallet.",
     donNone:"Nothing to offer from here — this claim paid out in a token the panel does not carry.",
     donAmount:"{amt}{usd} on {chain}",
     donTooSmall:"That share rounds to zero at this token's precision. Pick a larger one.",
     donOpen:"Open in wallet", donCopy:"Copy the address", donCopied:"Copied",
+    donCustom:"Other ({sym})", donCustomAria:"Custom amount",
     donQrAlt:"QR code of the payment request",
     noTipAddr:"Tip address not set: fill in TIP_ADDRESS at the top of the script before deploying.",
     thanks:"Thank you 🙏 — transaction {h}…",
@@ -1765,55 +1779,58 @@ const brutDe = (montant, dec) => {
    montants fixes en ETH. Ni l'un ni l'autre n'appelle le wallet. */
 const DON_FIXES = [0.001, 0.005, 0.02];
 const donEtats = new Map();
-function donRendre(id) {
-  const zone = document.getElementById(id), etat = donEtats.get(id);
-  if (!zone || !etat) return;
-  zone.innerHTML = "";
-  const { choix, pos, idx, mode } = etat;
-  if (!choix.length || !pos) { zone.appendChild(el("p", "fine", t("donNone"))); return; }
-
-  if (choix.length > 1) {
-    const ligneJetons = el("div", "donrow jetons");
-    for (const q of choix) {
-      const b = el("button", "tipbtn" + (q === pos ? " solid" : ""),
-        q.symbol + " · " + CHAIN_META[q.chainId].name);
-      b.addEventListener("click", () => { etat.pos = q; donRendre(id); });
-      ligneJetons.appendChild(b);
-    }
-    zone.appendChild(ligneJetons);
-  }
-
+function donOptions(etat) {
+  const { pos, mode } = etat;
   /* Une part se calcule sur l'entier de la chaîne, pas sur le flottant
      d'affichage : 10 % de 0,4 ETH passait par 0.04000000000000001 et
      l'URI demandait un wei de trop. */
-  const options = mode === "part"
+  return mode === "part"
     ? DON_PARTS.map(q => ({ lib: q + " %", montant: pos.amount * q / 100,
         brut: pos.brut !== undefined ? (BigInt(pos.brut) * BigInt(q) / 100n).toString() : null }))
     : DON_FIXES.map(v => ({ lib: fmtAmt(v) + " " + pos.symbol, montant: v, brut: null }));
-  const ligneParts = el("div", "donrow montants");
-  options.forEach((o, i) => {
-    const b = el("button", "tipbtn" + (i === idx ? " solid" : ""), o.lib);
-    b.addEventListener("click", () => { etat.idx = i; donRendre(id); });
-    ligneParts.appendChild(b);
-  });
-  zone.appendChild(ligneParts);
+}
 
-  const opt = options[Math.min(idx, options.length - 1)];
-  const montant = opt.montant;
+/* Seule la sortie dépend du montant : la reconstruire laisse le champ libre
+   intact, alors que redessiner toute la zone lui volerait le focus à chaque
+   frappe. */
+function donSortie(id) {
+  const etat = donEtats.get(id);
+  const zone = document.getElementById(id);
+  if (!etat || !zone) return;
+  const sortie = zone.querySelector(".donout");
+  if (!sortie) return;
+  sortie.innerHTML = "";
+  const { pos, idx, libre } = etat;
   const dec = Number.isFinite(pos.dec) ? pos.dec : 18;
-  const brut = opt.brut !== null ? opt.brut : brutDe(montant, dec);
-  if (BigInt(brut) <= 0n) { zone.appendChild(el("p", "fine", t("donTooSmall"))); return; }
-  const uri = uriPaiement(pos, brut);
 
+  let montant, brut;
+  if (libre !== null && libre !== undefined) {
+    montant = libre;
+    brut = brutDe(montant, dec);
+  } else {
+    const options = donOptions(etat);
+    const opt = options[Math.min(idx, options.length - 1)];
+    montant = opt.montant;
+    brut = opt.brut !== null ? opt.brut : brutDe(montant, dec);
+  }
+  if (!(montant > 0) || BigInt(brut) <= 0n) {
+    sortie.appendChild(el("p", "fine", t("donTooSmall")));
+    return;
+  }
+  const uri = uriPaiement(pos, brut);
   const px = prixDe(pos.token);
-  zone.appendChild(el("p", null, t("donAmount", {
+
+  /* QR à gauche, le reste à droite : empilés, ces deux blocs faisaient à eux
+     seuls la moitié de la hauteur du panneau. */
+  const boite = el("div", "donqr");
+  boite.appendChild(qrSvg(uri, 132));
+  sortie.appendChild(boite);
+
+  const details = el("div", "dondetails");
+  details.appendChild(el("p", "donamt", t("donAmount", {
     amt: fmtAmt(montant) + " " + pos.symbol,
     usd: px ? " (" + fmtUSD(montant * px) + ")" : "",
     chain: CHAIN_META[pos.chainId].name })));
-
-  const boite = el("div", "donqr");
-  boite.appendChild(qrSvg(uri));
-  zone.appendChild(boite);
 
   const acts = el("div", "donrow actions");
   const ouvrir = el("a", "tipbtn solid", t("donOpen"));
@@ -1825,8 +1842,61 @@ function donRendre(id) {
     catch (e) { copier.textContent = TIP_ADDRESS; }
   });
   acts.appendChild(copier);
-  zone.appendChild(acts);
-  zone.appendChild(el("p", "fine mono", TIP_ADDRESS));
+  details.appendChild(acts);
+  details.appendChild(el("p", "fine mono", TIP_ADDRESS));
+  sortie.appendChild(details);
+}
+
+function donRendre(id) {
+  const zone = document.getElementById(id), etat = donEtats.get(id);
+  if (!zone || !etat) return;
+  zone.innerHTML = "";
+  const { choix, pos } = etat;
+  if (!choix.length || !pos) { zone.appendChild(el("p", "fine", t("donNone"))); return; }
+
+  if (choix.length > 1) {
+    const ligneJetons = el("div", "donrow jetons");
+    for (const q of choix) {
+      const b = el("button", "tipbtn" + (q === pos ? " solid" : ""),
+        q.symbol + " · " + CHAIN_META[q.chainId].name);
+      b.addEventListener("click", () => { etat.pos = q; etat.libre = null; donRendre(id); });
+      ligneJetons.appendChild(b);
+    }
+    zone.appendChild(ligneJetons);
+  }
+
+  const ligneParts = el("div", "donrow montants");
+  const puces = [];
+  donOptions(etat).forEach((o, i) => {
+    const b = el("button", "tipbtn", o.lib);
+    b.addEventListener("click", () => {
+      etat.idx = i; etat.libre = null;
+      champ.value = "";
+      puces.forEach((x, j) => x.classList.toggle("solid", j === i));
+      donSortie(id);
+    });
+    puces.push(b); ligneParts.appendChild(b);
+  });
+
+  /* Montant libre : les paliers ne conviennent pas à tout le monde, et un
+     jeton à six décimales ne se dose pas comme de l'ETH. */
+  const champ = el("input", "donlibre");
+  champ.type = "text"; champ.inputMode = "decimal";
+  champ.setAttribute("aria-label", t("donCustomAria"));
+  champ.placeholder = t("donCustom", {sym: pos.symbol});
+  champ.addEventListener("input", () => {
+    const v = parseFloat(champ.value.replace(",", "."));
+    etat.libre = champ.value.trim() === "" ? null : (Number.isFinite(v) ? v : 0);
+    puces.forEach(x => x.classList.toggle("solid",
+      etat.libre === null && puces.indexOf(x) === etat.idx));
+    donSortie(id);
+  });
+  ligneParts.appendChild(champ);
+  zone.appendChild(ligneParts);
+  puces.forEach((x, j) => x.classList.toggle("solid", j === etat.idx));
+
+  zone.appendChild(el("div", "donout"));
+  donSortie(id);
 }
 
 /* Ce que la personne vient de retirer, hors AZTEC, dédoublonné. */
@@ -1839,7 +1909,7 @@ function donProposer(positions) {
     if (vus.has(k)) continue;
     vus.add(k); choix.push(p);
   }
-  donEtats.set("donzone", { choix, pos: choix[0] || null, idx: 0, mode: "part" });
+  donEtats.set("donzone", { choix, pos: choix[0] || null, idx: 0, libre: null, mode: "part" });
   donRendre("donzone");
 }
 
@@ -1847,7 +1917,7 @@ function donProposer(positions) {
    chaîne la moins chère d'abord. */
 donEtats.set("coffeezone", {
   choix: [8453, 1].map(chainId => ({ chainId, token: NATIVE, symbol: "ETH", amount: 0, dec: 18 })),
-  pos: null, idx: 0, mode: "fixe",
+  pos: null, idx: 0, libre: null, mode: "fixe",
 });
 donEtats.get("coffeezone").pos = donEtats.get("coffeezone").choix[0];
 donRendre("coffeezone");
