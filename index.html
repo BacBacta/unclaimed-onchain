@@ -135,6 +135,7 @@ button:disabled{opacity:.4; cursor:not-allowed}
 button.ghost{background:var(--panel-2); color:var(--ink); border:1px solid var(--glass-border-2); box-shadow:none}
 button.ghost:hover:not(:disabled){border-color:var(--cyan); filter:none; box-shadow:0 0 0 3px rgba(58,198,255,.12)}
 button.small{padding:11px 17px; font-size:14px}
+button[disabled]{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
 .hint{font-size:13px; color:var(--muted); margin:13px 0 0; line-height:1.5}
 .promise{
   margin:15px 0 0; display:flex; gap:11px; align-items:flex-start; font-size:13px; color:var(--ink-2);
@@ -268,7 +269,7 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
 <div class="topbar">
   <div class="brand"><span class="dot"></span> <span data-i18n="brand">Unclaimed Onchain</span></div>
   <div class="topacts">
-    <button class="support histbtn" id="historylink" hidden></button>
+    <button class="support histbtn" id="historylink"></button>
     <button class="support" id="supportlink" data-i18n="support">☕ Support</button>
   </div>
 </div>
@@ -803,6 +804,7 @@ function render(total) {
       const bc = el("button", "small", isDelivery()
         ? t("deliverTo", {addr: shortAddr(current.addr)})
         : t("claimOn", {name: meta.name}));
+      bc.dataset.claim = chainId;
       bc.addEventListener("click", () => claim(chainId, positions));
       act.appendChild(bv); act.appendChild(bc);
       act.appendChild(el("div", "note", isDelivery() ? t("deliverNote") : t("actNote")));
@@ -1197,22 +1199,24 @@ function renderHistory() {
   const panel = document.getElementById("historypanel");
   if (!btn || !panel) return;
   btn.textContent = t("histBtn", {n: list.length});
-  btn.hidden = list.length === 0;
-  if (list.length === 0) { panel.hidden = true; panel.innerHTML = ""; return; }
   const ouvert = !panel.hidden;
   panel.innerHTML = "";
   const card = el("div", "glass edge hist");
   card.appendChild(el("h4", null, t("histH")));
   card.appendChild(el("p", null, t("histP")));
   card.appendChild(el("p", "fine", t("histFine")));
-  for (const r of list) if (CHAIN_META[r.c]) card.appendChild(histLine(r));
-  const acts = el("div", "hacts");
-  const bc = el("button", "small ghost", t("histCheck"));
-  bc.addEventListener("click", () => histCheck(card));
-  const bx = el("button", "small ghost", t("histClear"));
-  bx.addEventListener("click", () => { histSave([]); renderHistory(); });
-  acts.appendChild(bc); acts.appendChild(bx);
-  card.appendChild(acts);
+  if (list.length === 0) {
+    card.appendChild(el("p", null, t("histEmpty")));
+  } else {
+    for (const r of list) if (CHAIN_META[r.c]) card.appendChild(histLine(r));
+    const acts = el("div", "hacts");
+    const bc = el("button", "small ghost", t("histCheck"));
+    bc.addEventListener("click", () => histCheck(card));
+    const bx = el("button", "small ghost", t("histClear"));
+    bx.addEventListener("click", () => { histSave([]); renderHistory(); });
+    acts.appendChild(bc); acts.appendChild(bx);
+    card.appendChild(acts);
+  }
   panel.appendChild(card);
   panel.hidden = !ouvert;
 }
@@ -1260,6 +1264,11 @@ function retotal() {
     }
   const big = out.querySelector(".total .big");
   if (big) big.textContent = fmtUSD(restant);
+  for (const [cid, arr] of current.groups)
+    if (arr.length && arr.every(p => p.liveZero)) {
+      const b = out.querySelector('button[data-claim="' + cid + '"]');
+      if (b) b.disabled = true;
+    }
   const lead = out.querySelector(".total .lead");
   if (lead && restant === 0 && vides) lead.textContent = t("totalLeadNone");
   if (!vides) return;
@@ -1318,6 +1327,13 @@ async function claim(chainId, positions) {
   const m = message(t("prep"), null);
   statusNode = m;
   try {
+    // les soldes relus à zéro ne donnent lieu à aucune transaction
+    positions = positions.filter(p => !p.liveZero);
+    if (!positions.length) {
+      m.textContent = t("allClaimed");
+      m.classList.add("warn");
+      return;
+    }
     const p = await provider();
     const from = "0x" + await connected();
     await switchChain(chainId);
