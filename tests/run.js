@@ -52,7 +52,15 @@ const PAGE = (() => {
   fs.writeFileSync(out, src.slice(0, i) + inj + src.slice(i));
   return out;
 })();
-const filtre = process.argv.slice(2).filter(a => !a.startsWith('-'));
+/* Palier rapide : les suites qui tiennent sous 35 s et couvrent les chemins
+   qu'on casse le plus souvent — format et prix, refus, zéro, balayage,
+   messages du wallet, repli RPC, réseau. ~35 s au mur au lieu de ~110.
+   C'est le palier de la boucle d'itération ; la batterie entière reste ce
+   qu'on passe avant de pousser. */
+const VITE = ['test_nan', 'test_petit', 'test_prix', 'test_refus', 'test_silence',
+              'test_zero', 'test_repli', 'test_sweep', 'test_msg', 'test_hang', 'test_switch'];
+const args = process.argv.slice(2);
+const filtre = args.includes('--vite') ? VITE : args.filter(a => !a.startsWith('-'));
 const suites = fs.readdirSync(__dirname).filter(f => /^test_.*\.js$/.test(f))
   .filter(f => !filtre.length || filtre.some(x => f.includes(x))).sort();
 

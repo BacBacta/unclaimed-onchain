@@ -7,7 +7,8 @@ history, pricing, and the copy shown in each of them.
 
 ```bash
 cd tests && npm install         # once — the site itself has no dependencies
-node run.js                     # the whole battery, ~1.7 min
+node run.js --vite              # fast tier, ~35 s — the iteration loop
+node run.js                     # the whole battery, ~1.8 min — before pushing
 node run.js seuil prix          # only suites whose name contains these
 RAPIDE=0 node run.js            # with the page's real timeouts
 ```
@@ -61,6 +62,15 @@ fixed instant, so they hold under both profiles.
 `RAPIDE=0` runs everything against the file as shipped, with the real 20 s and
 180 s deadlines. Run it before deploying: it is the profile that proves the
 shortened ones change nothing.
+
+## Two tiers
+
+`--vite` runs the 11 suites that finish under 35 s and cover what breaks most
+often: formatting and pricing, refusals, zero balances, the sweep, wallet
+messages, the RPC fallback, the network contract. It is what you run between
+edits. The full battery is what you run before pushing — it is under two
+minutes, so there is no excuse for skipping it, but a 35 s loop is a different
+kind of tool from a 110 s one.
 
 ## Assertions pinned to live chain state
 
