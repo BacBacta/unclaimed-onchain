@@ -33,7 +33,8 @@ const txtOf=p=>p.locator('#out').innerText().catch(()=> '');
 async function chercher(page,a,re,ms=60000){
   await page.fill('#addr',a); await page.click('#go');
   const t0=Date.now(); let x='';
-  while(Date.now()-t0<ms){ x=await txtOf(page); if(re.test(x)) return x; await page.waitForTimeout(1200); }
+  while(Date.now()-t0<ms){ x=await txtOf(page); if(re.test(x)) return x; await page.waitForTimeout(150); }
+  console.log('  ⚠ sondage épuisé sans jamais voir ' + re);
   return x;
 }
 

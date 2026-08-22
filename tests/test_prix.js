@@ -25,7 +25,12 @@ async function essai(html,label){
   while(Date.now()-t0<60000){ txt=await page.locator('#out').innerText().catch(()=> '');
     if(/re-read live|Nothing credited/.test(txt)) break; await page.waitForTimeout(1200); }
   await page.waitForTimeout(500);
-  const r={txt,
+  const sonde = await page.evaluate(() => ({
+    prixAztec: prixDe('0xA27EC0006e59f245217Ff08CD52A7E8b169E62D2'),
+    valorise1000: 1000 * (prixDe('0xA27EC0006e59f245217Ff08CD52A7E8b169E62D2') || 0),
+    fmt: Object.fromEntries([0, 1, 35, 100, 35.5, 0.5, 0.018594, 1234.5].map(n => [String(n), fmtAmt(n)])),
+  })).catch(() => ({}));
+  const r={...sonde, txt,
     total:await page.locator('#out .total .big').innerText().catch(()=>'?'),
     sous:await page.locator('#out .chain-head .amt').allInnerTexts().catch(()=>[]),
     tok:await page.locator('#out .pos .tok').allInnerTexts().catch(()=>[]),
@@ -34,23 +39,30 @@ async function essai(html,label){
   await b.close(); return r;
 }
 (async()=>{
-  console.log('adresse :', A, '(35 AZTEC ≈ 0,49 $, absente de l\'instantané)\n');
-  /* AVANT=live.html rejoue le bug sur les octets déployés — utile une fois,
-     inutile à chaque tour : la non-régression, c'est la page d'après. */
-  const avant = process.env.AVANT ? await essai(fs.readFileSync(process.env.AVANT,'utf8'),'en ligne') : null;
-  const apres=await essai(fs.readFileSync(process.env.PAGE || require('path').join(__dirname, '..', 'index.html'),'utf8'),'corrigé');
-  console.log();
-  if (avant) {
-    check('bug reproduit : total à zéro sur la version en ligne', /\$0\.00/.test(avant.total), avant.total);
-    check('bug reproduit : point décimal orphelin', avant.tok.some(t=>/\d\.\s|\d\.$/.test(t)), JSON.stringify(avant.tok));
-  }
-  check('après correctif : le montant s\'écrit « 35 AZTEC »',
-    apres.tok.some(t=>/^35 AZTEC$/.test(t.trim())), JSON.stringify(apres.tok));
-  check('après correctif : la ligne est valorisée (~0,49 $)',
-    apres.usd.some(u=>/^\$0\.4\d$/.test(u.trim())), JSON.stringify(apres.usd));
-  check('après correctif : le total n\'est plus nul', !/\$0\.00/.test(apres.total), apres.total);
-  check('après correctif : le sous-total de chaîne suit', apres.sous.some(x=>/\$0\.4\d/.test(x)), JSON.stringify(apres.sous));
-  check('l\'intitulé n\'annonce pas « déjà réclamé »', !/Already claimed/i.test(apres.txt));
+  /* Ce test portait sur un solde onchain vivant (35 AZTEC à cette adresse).
+     Quelqu'un les a réclamés — c'est le registre qui fonctionne, pas une
+     régression — et le test cassait. Les deux correctifs se prouvent sans
+     dépendre d'un solde : la fonction de prix et le formatage sont dans la
+     page, et la seule chose qu'on demande au direct, c'est qu'aucune ligne
+     ne reste sans valorisation, quel que soit le montant du jour. */
+  console.log('adresse :', A, '(position AZTEC, absente de l\'instantané)\n');
+
+  const apres = await essai(fs.readFileSync(process.env.PAGE || require('path').join(__dirname, '..', 'index.html'),'utf8'),'corrigé');
+
+  check('prixDe() valorise AZTEC depuis l\'instantané entier',
+    apres.prixAztec > 0.001 && apres.prixAztec < 1, 'prix=' + apres.prixAztec);
+  check('un montant entier ne garde pas de point décimal orphelin',
+    apres.fmt['35'] === '35' && apres.fmt['1'] === '1' && apres.fmt['100'] === '100',
+    JSON.stringify(apres.fmt));
+  check('les décimales utiles sont conservées',
+    apres.fmt['35.5'] === '35.5' && apres.fmt['0.018594'] === '0.018594', JSON.stringify(apres.fmt));
+  check('la valorisation d\'une position suit le prix du jeton',
+    Math.abs(apres.prixAztec * 1000 - apres.valorise1000) < 0.01,
+    `prix=${apres.prixAztec} · 1000 jetons valorisés ${apres.valorise1000}`);
+  check('aucune ligne laissée sans prix à l\'écran',
+    apres.usd.every(u => /^\$/.test(u.trim())), JSON.stringify(apres.usd));
+  check('l\'intitulé n\'annonce pas « déjà réclamé » à tort',
+    apres.usd.length === 0 || !/Already claimed/i.test(apres.txt));
   console.log(fails===0?'\nTOUS LES TESTS PASSENT':`\n${fails} ÉCHEC(S)`);
   process.exit(fails===0?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(1);});

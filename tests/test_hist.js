@@ -43,6 +43,21 @@ async function retirer(page, addr){
 }
 
 (async()=>{
+/* Dormir 2,5 s « le temps que » revient à payer le pire cas à chaque tour.
+   On sonde la fin réelle de la vérification — le message « n transaction(s)
+   re-read from the chain » — puis on juge le statut. Attendre le statut
+   lui-même ne marcherait pas pour le cas où il doit RESTER inchangé. */
+async function jusqua(page, re, cible, ms = 8000) {
+  const t0 = Date.now(); let txt = '';
+  while (Date.now() - t0 < ms) {
+    txt = await cible(page).innerText().catch(() => '');
+    if (re.test(txt)) return txt;
+    await page.waitForTimeout(100);
+  }
+  console.log('  ⚠ sondage épuisé sans jamais voir ' + re);
+  return txt;
+}
+
   console.log('A — historique vide au départ');
   { const {b,page}=await open();
     check('bouton visible avec compteur à 0', /\(0\)/.test(await btn(page).innerText()), await btn(page).innerText());
@@ -100,7 +115,7 @@ async function retirer(page, addr){
     await retirer(page, BENEF);
     await btn(page).click(); await page.waitForTimeout(400);
     await page.locator('#historypanel button',{hasText:'Check statuses'}).click();
-    await page.waitForTimeout(2500);
+    await jusqua(page, /re-read from the chain/, p => p.locator('#out'));
     check('statut passé à « confirmed »', /confirmed/i.test(await panneau(page).innerText()),
       (await panneau(page).innerText()).slice(0,300));
     await b.close(); }
@@ -108,7 +123,7 @@ async function retirer(page, addr){
     await retirer(page, BENEF);
     await btn(page).click(); await page.waitForTimeout(400);
     await page.locator('#historypanel button',{hasText:'Check statuses'}).click();
-    await page.waitForTimeout(2500);
+    await jusqua(page, /re-read from the chain/, p => p.locator('#out'));
     check('transaction échouée signalée « reverted »', /reverted/i.test(await panneau(page).innerText()),
       (await panneau(page).innerText()).slice(0,300));
     await b.close(); }
@@ -116,7 +131,7 @@ async function retirer(page, addr){
     await retirer(page, BENEF);
     await btn(page).click(); await page.waitForTimeout(400);
     await page.locator('#historypanel button',{hasText:'Check statuses'}).click();
-    await page.waitForTimeout(2500);
+    await jusqua(page, /re-read from the chain/, p => p.locator('#out'));
     check('reçu absent → reste « sent »', /sent/i.test(await panneau(page).innerText()),
       (await panneau(page).innerText()).slice(0,300));
     await b.close(); }

@@ -45,6 +45,7 @@ async function waitFor(page,re,ms=60000){
   const t0=Date.now(); let txt='';
   while(Date.now()-t0<ms){ txt=await page.locator('#out').innerText().catch(()=> '');
     if(re.test(txt)) return txt; await page.waitForTimeout(1500); }
+  console.log('  ⚠ sondage épuisé sans jamais voir ' + re);
   return txt;
 }
 

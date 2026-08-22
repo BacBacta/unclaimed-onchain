@@ -44,7 +44,8 @@ async function open({mode='real', wallet=false}={}){
 const outTxt = p => p.locator('#out').innerText().catch(()=> '');
 async function waitFor(page, re, ms=30000){
   const t0=Date.now(); let txt='';
-  while(Date.now()-t0<ms){ txt=await outTxt(page); if(re.test(txt)) return txt; await page.waitForTimeout(1200); }
+  while(Date.now()-t0<ms){ txt=await outTxt(page); if(re.test(txt)) return txt; await page.waitForTimeout(150); }
+  console.log('  ⚠ sondage épuisé après ' + ms + ' ms sans jamais voir ' + re);
   return txt;
 }
 
@@ -52,7 +53,7 @@ async function waitFor(page, re, ms=30000){
   console.log('A — SANS WALLET : adresse retirée → le vrai montant s\'affiche tout seul');
   { const {b,page}=await open();
     await page.fill('#addr',VIDE); await page.click('#go');
-    const txt=await waitFor(page,/Already claimed/);
+    const txt=await waitFor(page,/Already claimed/i);   // .lead est rendu en majuscules
     check('état « déjà réclamé » atteint sans aucun clic', /Nothing is waiting for this address any more/.test(txt), txt.slice(-300));
     check('total ramené à $0.00 automatiquement',
       (await page.locator('#out .total .big').innerText())==='$0.00',
@@ -109,7 +110,7 @@ async function waitFor(page, re, ms=30000){
   console.log('\nF — AVEC WALLET : Deliver désactivé automatiquement sur solde vidé');
   { const {b,page}=await open({wallet:true});
     await page.fill('#addr',VIDE); await page.click('#go');
-    await waitFor(page,/already claimed/);
+    await waitFor(page,/already claimed/i);   // idem : innerText applique text-transform
     await page.waitForTimeout(600);
     check('aucun bouton de retrait : il n\'y a plus rien à livrer',
       (await page.locator('#out button',{hasText:'Deliver to'}).count())===0);

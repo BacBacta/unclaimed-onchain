@@ -25,7 +25,11 @@ function chercherChrome() {
 }
 const CHROME = chercherChrome();
 
-const PAR = +(process.env.PAR || 6);
+/* Les suites attendent plus qu'elles ne calculent, donc deux fois le nombre
+   de cœurs est le bon point : mesuré ici sur 4 cœurs, 4 → 131 s, 6 → 117 s,
+   8 → 107 s, 12 → 125 s et instable. Au-delà elles se privent mutuellement
+   de CPU et les sondages commencent à expirer. */
+const PAR = +(process.env.PAR || Math.min(12, Math.max(4, 2 * (require('os').cpus().length || 4))));
 const SOURCE = process.env.PAGE || path.join(__dirname, '..', 'index.html');
 
 /* Prouver qu'une borne de temps existe n'oblige pas à l'attendre en vrai :
@@ -71,10 +75,12 @@ function une(f) {
       const s = Math.round((Date.now() - d0) / 1000);
       const nOk = (out.match(/^\s+ok\s/gm) || []).length;
       const nKo = (out.match(/^\s*FAIL\s/gm) || []).length;
-      res.push({ f, code, s, nOk, nKo, out });
+      const alertes = out.match(/^\s*⚠ .*$/gm) || [];
+      res.push({ f, code, s, nOk, nKo, out, alertes });
       // certaines suites tranchent par leur code de sortie sans compter d'assertions
       const compte = nOk || nKo ? `${nOk} ok${nKo ? ', ' + nKo + ' FAIL' : ''}` : 'verdict par code de sortie';
-      console.log(`${code === 0 ? '  ✓' : '  ✗'} ${f.padEnd(24)} ${String(s).padStart(4)}s  ${compte}`);
+      console.log(`${code === 0 ? '  ✓' : '  ✗'} ${f.padEnd(24)} ${String(s).padStart(4)}s  ${compte}`
+        + (alertes.length ? `  ⚠ ${alertes.length} sondage(s) épuisé(s)` : ''));
       done();
     });
   });

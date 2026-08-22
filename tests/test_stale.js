@@ -55,7 +55,14 @@ const lead = p => p.locator('#out .total .lead').innerText();
 
   console.log('\nB — adresse encore créditée : rien ne doit changer');
   { const {b,page}=await open();
-    await page.fill('#addr',PLEIN); await page.click('#go'); await page.waitForTimeout(900);
+    await page.fill('#addr',PLEIN); await page.click('#go');
+    /* 900 ms attrapait le total pendant le balayage automatique et son
+       animation : la comparaison portait alors sur un chiffre transitoire.
+       On attend que le direct se soit posé avant de prendre la référence. */
+    { const t=Date.now(); let x='';
+      while(Date.now()-t<45000){ x=await page.locator('#out').innerText().catch(()=> '');
+        if(/re-read live|not re-read|Nothing/.test(x)) break; await page.waitForTimeout(150); } }
+    await page.waitForTimeout(1100);   // laisser l'animation du total se terminer
     const totalAvant=await grandTotal(page);
     await page.locator('#out button',{hasText:'Verify live'}).first().click();
     const t0=Date.now(); let apres='';

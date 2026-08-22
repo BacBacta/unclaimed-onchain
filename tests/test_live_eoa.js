@@ -63,6 +63,20 @@ async function search(page, addr) {
 const codeCalls = (log, addr) => log.filter(e =>
   e.method === 'eth_getCode' && e.params[0].toLowerCase() === addr.toLowerCase()).length;
 
+/* Attendre 3,5 à 4 s « le pire cas » après chaque clic coûtait 39 s par tour.
+   On sonde la condition propre à chaque scénario. Là où la vérification doit
+   ne RIEN produire, on attend son achèvement réel plutôt qu'une absence, qui
+   n'arrive jamais. */
+async function attendre(cond, ms = 25000, quoi = '') {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (await cond()) return true;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  console.log('  \u26a0 sondage \u00e9puis\u00e9 apr\u00e8s ' + ms + ' ms : ' + quoi);
+  return false;
+}
+
 (async () => {
   console.log('cible :', LIVE, '— RPC réel : mainnet.base.org\n');
 
@@ -72,7 +86,7 @@ const codeCalls = (log, addr) => log.filter(e =>
     const { browser, page, log, errs } = await session();
     await search(page, T.zoraEoa.addr);
     await page.locator('#out button', { hasText:'Verify live' }).first().click();
-    await page.waitForTimeout(4000);
+    await attendre(async () => (await outText(page)).includes('is a regular wallet'), 25000, 'regular wallet');
     const txt = await outText(page);
     check('eth_getCode appelé sur le bénéficiaire', codeCalls(log, T.zoraEoa.addr) >= 1,
       JSON.stringify(log.map(e=>e.method)));
@@ -91,14 +105,19 @@ const codeCalls = (log, addr) => log.filter(e =>
     await search(page, T.zoraContract.addr);
     const btn = page.locator('#out button', { hasText:'Verify live' }).first();
     await btn.click();
-    await page.waitForTimeout(4000);
+    await attendre(async () => (await outText(page)).includes('is a contract'), 25000, 'is a contract');
     let txt = await outText(page);
     check('eth_getCode appelé sur le bénéficiaire', codeCalls(log, T.zoraContract.addr) >= 1);
     check('avertissement « is a contract » affiché', txt.includes('is a contract'), txt.slice(-320));
     check('aucun message « regular wallet »', !txt.includes('is a regular wallet'));
 
     const before = codeCalls(log, T.zoraContract.addr);
-    await btn.click(); await page.waitForTimeout(4000);
+    const appelsAvant = log.length;
+    await btn.click();
+    /* Attendre 4 s pour constater une absence est à la fois lent et faible :
+       on attend que la re-vérification ait bel et bien tourné (de nouveaux
+       appels RPC), puis on constate qu'aucun n'était un eth_getCode. */
+    await attendre(async () => log.length > appelsAvant, 25000, 'seconde vérification');
     check('résultat mémorisé : pas de second eth_getCode',
       codeCalls(log, T.zoraContract.addr) === before, `avant=${before} après=${codeCalls(log, T.zoraContract.addr)}`);
     await browser.close();
@@ -110,7 +129,8 @@ const codeCalls = (log, addr) => log.filter(e =>
     const { browser, page, log } = await session();
     await search(page, T[key].addr);
     await page.locator('#out button', { hasText:'Verify live' }).first().click();
-    await page.waitForTimeout(4000);
+    await attendre(async () => /Balances re-read|real balance confirmed|already claimed|did not answer/i
+      .test(await outText(page)), 25000, 'fin de la vérification');
     const txt = await outText(page);
     check(`${key} → aucun eth_getCode émis`, codeCalls(log, T[key].addr) === 0,
       JSON.stringify(log.map(e=>e.method)));
@@ -125,11 +145,13 @@ const codeCalls = (log, addr) => log.filter(e =>
     const { browser, page, sent } = await session();
     await search(page, T.zoraContract.addr);
     const btn = page.locator('#out button', { hasText:'Deliver to' }).first();
-    await btn.click(); await page.waitForTimeout(3500);
+    await btn.click();
+    await attendre(async () => (await outText(page)).includes('sends native ETH'), 25000, 'avertissement natif');
     let txt = await outText(page);
     check('1er clic → avertissement, rien envoyé',
       txt.includes('sends native ETH') && sent.length === 0, `envoyées=${sent.length} | ${txt.slice(-240)}`);
-    await btn.click(); await page.waitForTimeout(3500);
+    await btn.click();
+    await attendre(async () => sent.length === 1, 25000, 'transaction envoyée');
     check('2e clic → transaction construite et signée', sent.length === 1, `envoyées=${sent.length}`);
     if (sent.length) {
       const tx = sent[0], benef = T.zoraContract.addr.slice(2).toLowerCase();
@@ -144,7 +166,7 @@ const codeCalls = (log, addr) => log.filter(e =>
     const { browser, page, sent } = await session();
     await search(page, T.zoraEoa.addr);
     await page.locator('#out button', { hasText:'Deliver to' }).first().click();
-    await page.waitForTimeout(3500);
+    await attendre(async () => sent.length === 1, 25000, 'transaction envoyée');
     const txt = await outText(page);
     check('bénéficiaire EOA → envoi direct, aucun avertissement',
       sent.length === 1 && !txt.includes('sends native ETH'), `envoyées=${sent.length}`);
@@ -154,7 +176,7 @@ const codeCalls = (log, addr) => log.filter(e =>
     const { browser, page, sent } = await session();
     await search(page, T.clankerContract.addr);
     await page.locator('#out button', { hasText:'Deliver to' }).first().click();
-    await page.waitForTimeout(3500);
+    await attendre(async () => sent.length === 1, 25000, 'transaction envoyée');
     check('contrat mais ERC-20 → envoi direct, aucun avertissement', sent.length === 1,
       `envoyées=${sent.length}`);
     await browser.close();
@@ -166,7 +188,7 @@ const codeCalls = (log, addr) => log.filter(e =>
     const { browser, page, log, sent } = await session();
     await search(page, T.delegated.addr);
     await page.locator('#out button', { hasText:'Verify live' }).first().click();
-    await page.waitForTimeout(4000);
+    await attendre(async () => (await outText(page)).includes('delegates its code'), 25000, 'délégation 7702');
     const txt = await outText(page);
     check('eth_getCode appelé', codeCalls(log, T.delegated.addr) >= 1);
     check('reconnu comme portefeuille délégué, pas comme contrat',
@@ -174,7 +196,7 @@ const codeCalls = (log, addr) => log.filter(e =>
     check('adresse du délégué affichée',
       txt.includes(T.delegated.target.slice(0,6)), txt.slice(-320));
     await page.locator('#out button', { hasText:'Deliver to' }).first().click();
-    await page.waitForTimeout(3500);
+    await attendre(async () => sent.length === 1, 25000, 'transaction envoyée');
     const txt2 = await outText(page);
     check('aucun garde-fou : envoi direct',
       sent.length === 1 && !txt2.includes('sends native ETH'), `envoyées=${sent.length}`);
