@@ -1268,7 +1268,12 @@ async function histCheck(card) {
    reste réellement, et on cesse d'annoncer un montant « en attente ». */
 function retotal() {
   if (!current || !current.groups) return;
-  const worth = p => p.usdLive !== undefined ? p.usdLive : (p.liveZero ? 0 : p.usd);
+  // une position sans prix connu vaut 0 dans un total, jamais undefined :
+  // sans cela une seule d'entre elles suffit à afficher « $NaN ».
+  const worth = p => {
+    const v = p.usdLive !== undefined ? p.usdLive : (p.liveZero ? 0 : p.usd);
+    return Number.isFinite(v) ? v : 0;
+  };
   let restant = 0, vides = 0;
   for (const arr of current.groups.values())
     for (const p of arr) {
