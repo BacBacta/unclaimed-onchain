@@ -53,13 +53,15 @@ button becomes "Deliver to 0x…".
 1. **Search** — you paste an address. The page validates its EIP-55 checksum, then
    looks it up in an embedded snapshot. The lookup itself is local; no wallet, nothing
    to authorise.
-2. **Live figures, automatically** — right after the lookup, every displayed balance
-   is re-read from the contracts in one Multicall3 `eth_call` per chain, through
-   public RPC endpoints. Amounts and totals switch from the snapshot estimate to the
-   real figure, withdrawn balances show as such, and their buttons are disabled. No
-   wallet is needed for this. If the endpoints are unreachable, the snapshot stays,
-   labelled as unverified. A *Verify live* button still lets you re-read through your
-   own wallet's RPC instead of trusting the public ones.
+2. **Live figures, automatically** — right after the lookup, **all 102 protocol-token
+   pairs the registry tracks** are read from the contracts in one Multicall3
+   `eth_call` per chain, through public RPC endpoints. The same check runs for every
+   address, in or out of the snapshot, so a balance the snapshot never listed —
+   because it is small, or newer — still shows up. Amounts and totals become the real
+   figures, a fully withdrawn address says so, and a chain whose endpoints did not
+   answer keeps its snapshot rows, marked as not re-read. No wallet is needed. A
+   *Verify live* button still re-reads through your own wallet's RPC instead of
+   trusting the public endpoints.
 3. **Claim** — the page builds one transaction per protocol. Splits V1 batches every
    token on a chain into a single `withdraw` call.
 
@@ -127,8 +129,17 @@ unless you tap one.
 
 The embedded snapshot was built from onchain events (via Dune) plus a state read
 for Clanker v3.1, by summing what was credited to each address and subtracting what
-was withdrawn. It covers balances of **$25 and above**, as of **21 August 2026**,
-across Ethereum, Base and Optimism.
+was withdrawn. It lists **27,630 addresses down to $0.50**, as of **21–22 August
+2026**, across Ethereum, Base and Optimism.
+
+There is no floor worth defending: withdrawing costs about $0.001 on Base and $0.02
+on Ethereum at current gas, so whether $3 is worth collecting is the beneficiary's
+call, not this registry's. The floor that remains exists only because the snapshot
+ships inside the page — it weighs 865 KB gzipped, against 216 KB when the cut was at
+$25. And since every search re-reads all 102 pairs live, the floor no longer decides
+what can be *found*: an address holding $0.40 that is absent from the index still
+shows its balance when searched. `build_snapshot.py` takes `--min-line` and
+`--min-total` if you rebuild it.
 
 Snapshots age, so the page does not let one assert anything: balances are re-read
 live right after every search (see above), the headline total is recomputed from
@@ -154,6 +165,11 @@ from a browser without an indexer — the explorer method above remains the
 complete check.
 
 ### Known limits
+
+- The snapshot's dollar figures are estimates and some are badly stale — one address
+  it values at $507,097 actually holds about $364 today. This is why the page re-reads
+  everything live and shows that figure instead; the snapshot is a directory, not a
+  ledger.
 
 - Tokens without a market price are counted as zero, so the totals are a floor.
 - Native ETH in the Splits V2 Warehouse uses the pseudo-token

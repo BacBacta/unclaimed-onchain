@@ -24,8 +24,12 @@ NATIVE = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 PROTO  = ["v1", "v2", "zora", "clanker"]
 CHAINS = [1, 8453, 10]
 CHAIN_ID = {"ethereum": 1, "base": 8453, "optimism": 10}
-MIN_LINE  = 5      # ignorer une ligne sous 5 $
-MIN_TOTAL = 25     # ignorer une adresse totalisant moins de 25 $
+# Seuils par défaut. Le gaz coûte aujourd'hui ~0,001 $ sur Base : c'est au
+# bénéficiaire de juger si sa position vaut le retrait, pas à ce script.
+# Ils restent réglables, car l'instantané est embarqué dans la page et son
+# poids croît linéairement avec le nombre d'adresses retenues.
+MIN_LINE  = 0.5    # ignorer une ligne sous ce montant, en dollars
+MIN_TOTAL = 1      # ignorer une adresse totalisant moins que cela
 
 
 def load(csv_dir):
@@ -57,7 +61,7 @@ def load(csv_dir):
     return {k: pd.concat(v, ignore_index=True) for k, v in found.items()}
 
 
-def build(data, eth_price):
+def build(data, eth_price, min_line=MIN_LINE, min_total=MIN_TOTAL):
     from collections import defaultdict
     idx = defaultdict(list)
 
@@ -68,7 +72,7 @@ def build(data, eth_price):
             usd = float(usd); amount = float(amount)
         except (TypeError, ValueError):
             return
-        if usd != usd or amount != amount or usd < MIN_LINE:   # NaN ou trop petit
+        if usd != usd or amount != amount or usd < min_line:   # NaN ou trop petit
             return
         idx[addr.lower()].append([proto, chain, str(token).lower().replace("0x", ""),
                                   str(symbol)[:10], round(float(amount), 6), round(float(usd))])
@@ -109,7 +113,7 @@ def build(data, eth_price):
         for r in ck.dropna(subset=["unclaimed_usd"]).itertuples():
             add(r.fee_owner, "clanker", 8453, r.token, r.symbol, r.unclaimed, r.unclaimed_usd)
 
-    kept = {a: rows for a, rows in idx.items() if sum(x[5] for x in rows) >= MIN_TOTAL}
+    kept = {a: rows for a, rows in idx.items() if sum(x[5] for x in rows) >= min_total}
 
     # compactage : table de tokens dédupliquée + indices
     toks, out = {}, {}
@@ -133,6 +137,10 @@ def main():
     ap.add_argument("--csv-dir", default=".", help="dossier des exports CSV Dune")
     ap.add_argument("--html", default="index.html", help="fichier à mettre à jour")
     ap.add_argument("--eth-price", type=float, required=True, help="prix ETH en USD")
+    ap.add_argument("--min-line", type=float, default=MIN_LINE,
+                    help=f"ignorer une position sous ce montant en dollars (défaut {MIN_LINE})")
+    ap.add_argument("--min-total", type=float, default=MIN_TOTAL,
+                    help=f"ignorer une adresse totalisant moins (défaut {MIN_TOTAL})")
     a = ap.parse_args()
 
     print(f"Lecture de {a.csv_dir} …")
@@ -142,7 +150,8 @@ def main():
     if not data:
         sys.exit("Aucun CSV exploitable trouvé.")
 
-    blob, n_addr, total = build(data, a.eth_price)
+    print(f"  seuils : position ≥ ${a.min_line:g} · adresse ≥ ${a.min_total:g}")
+    blob, n_addr, total = build(data, a.eth_price, a.min_line, a.min_total)
     js = json.dumps(blob, separators=(",", ":"))
     print(f"\n{n_addr:,} adresses · {len(blob['t'])} tokens · ${total:,.0f} · {len(js)//1024} KB")
 
