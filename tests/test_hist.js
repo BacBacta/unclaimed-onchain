@@ -143,6 +143,10 @@ async function jusqua(page, re, cible, ms = 8000) {
     await page.locator('#historypanel button',{hasText:'Clear history'}).click();
     await page.waitForTimeout(600);
     check('compteur revenu à 0', /\(0\)/.test(await btn(page).innerText()), await btn(page).innerText());
+    check('l\'état vide oriente vers la recherche, au lieu de constater',
+      /per-device/.test(await panneau(page).innerText())
+      && /re-read live from the contracts/.test(await panneau(page).innerText()),
+      (await panneau(page).innerText()).slice(0, 400));
     check('état vide affiché', /No withdrawal sent/.test(await panneau(page).innerText()),
       (await panneau(page).innerText()).slice(0,200));
     await page.reload({waitUntil:'load'}); await page.waitForTimeout(1000);
