@@ -398,7 +398,7 @@ const I18N = {
     d3s:"Can someone claim on my behalf?",
     d3b:'<p>Yes — by design. The withdraw function doesn\'t check who calls it: it takes the beneficiary as an argument and sends them their funds. Anyone can pay the gas to <em>deliver</em> your money, without ever being able to divert it.</p>',
     d4s:"Where do the amounts come from?",
-    d4b:'<p>From a snapshot of onchain events on <strong>August 21, 2026</strong>, covering balances of at least $25. A snapshot ages: the <em>Verify live</em> button re-reads the real balance in the contract before any withdrawal. That figure is what counts.</p>',
+    d4b:'<p>From a snapshot of onchain events on <strong>August 21, 2026</strong>, covering balances of at least $25. A snapshot ages: the page re-reads every balance live from the contracts right after each search (through public RPC endpoints), and the <em>Verify live</em> button does the same through your own wallet. Those figures are what count.</p>',
     foot1:"Public data, reproducible method. Verified, immutable contracts. This site is not affiliated with Splits, Zora or Clanker.",
     foot2:"Snapshot as of August 21, 2026 · indicative valuation at $2,400/ETH · real amounts are those read from the contracts.",
     badFmt:"That address isn't in the right format. An Ethereum address starts with 0x and has 40 hex characters.",
@@ -408,14 +408,16 @@ const I18N = {
     emptyP:"No balance of at least $25 for this address as of August 21, 2026. Smaller or more recent amounts may still exist: ",
     liveScan:"Verify live onchain",
     totalLead:"Waiting for you",
-    totalCap:"estimate as of August 21, 2026 — the exact amount is the one in the contract",
+    totalCap:"estimate as of August 21, 2026 — checking the contracts live…",
+    totalCapLive:"re-read live from the contracts just now — this is the current figure",
+    totalCapStale:"estimate as of August 21, 2026 — live check unreachable right now; the exact amount is the one in the contract",
     verify:"Verify live", claimOn:"Claim on {name}",
     actNote:"You'll sign one transaction per protocol. Funds go to your address.",
     noVerify:"Nothing to verify for this chain in the snapshot. Use the Etherscan method for a manual check.",
     scanChain:"Scanning {name} — {n} balances in a single call…",
     sweepFound:"Found: {n} credited balance(s), read directly from the contracts. The snapshot doesn't know this address — these figures are live.",
     sweepNone:"Nothing credited to this address in any of the {n} protocol-token pairs this registry tracks — read live from the contracts, not from the snapshot. A token that first appeared after August 21, 2026 would not show here: the explorer method above remains the complete check.",
-    sweepSkipped:"Not scanned: {names}. Add that network to your wallet and run the scan again for full coverage.",
+    sweepSkipped:"Not scanned: {names} — the public RPC endpoints for that network did not answer. Try again in a moment, or use the explorer links.",
     sweepCap:"This live scan covers the {n} protocol-token pairs seen in the snapshot. A brand-new token would not appear here — the explorer links remain the complete check.",
     liveShort:"live \u2713",
     reading:"Reading real balances…",
@@ -630,6 +632,7 @@ function countUp(node, target) {
   if (reduce || target <= 0) { node.textContent = fmtUSD(target); return; }
   const dur = 900, t0 = performance.now();
   function step(now) {
+    if (node.dataset.hold) return;      // une valeur réelle a pris la main
     const k = Math.min(1, (now - t0) / dur);
     const e = 1 - Math.pow(1 - k, 3);           // easeOutCubic
     node.textContent = fmtUSD(target * e);
@@ -711,14 +714,13 @@ function lookup(addrRaw) {
     box.appendChild(el("h3", null, t("emptyH")));
     const p = el("p", null, t("emptyP"));
     box.appendChild(p);
-    if (hasWallet()) {
-      const b = el("button", "small ghost", t("liveScan"));
-      b.style.marginTop = "14px";
-      b.addEventListener("click", () => liveSweep(addr));
-      box.appendChild(b);
-    }
+    const b = el("button", "small ghost", t("liveScan"));
+    b.style.marginTop = "14px";
+    b.addEventListener("click", () => liveSweep(addr));
+    box.appendChild(b);
     out.appendChild(box);
     current = { addr, groups: new Map() };
+    liveSweep(addr);
     return;
   }
 
@@ -737,6 +739,63 @@ function lookup(addrRaw) {
   current = { addr, groups };
   render(total);
   noteHistory(addr);
+  autoLive(addr);
+}
+
+/* Relit tous les soldes affichés, chaîne par chaîne, en un eth_call
+   Multicall3 par chaîne via les RPC publics — sans wallet, sans clic.
+   Montants et totaux passent de l'estimation à la valeur réelle.    */
+let liveSeq = 0;
+async function autoLive(addr) {
+  if (!current || !current.groups || !current.groups.size) return;
+  const seq = ++liveSeq;
+  let lu = false, rate = false;
+  for (const [chainId, positions] of current.groups) {
+    try {
+      const calls = positions.map(p => balanceCall(p, addr));
+      const toks = [...new Set(positions.map(p => clean(p.token)).filter(tk => tk !== NATIVE))];
+      for (const tk of toks) calls.push({ to: "0x" + tk, data: "0x313ce567" });
+      const res = decodeAggregate3(await pubCall(chainId, MC3, encodeAggregate3(calls)));
+      if (seq !== liveSeq || !current || current.addr !== addr) return;
+      const dec = {};
+      toks.forEach((tk, i) => {
+        const r = res[positions.length + i];
+        let d = (r && r.ok && r.data.length >= 66) ? parseInt(r.data.slice(0, 66), 16) : 18;
+        if (!(d >= 0 && d <= 36)) d = 18;
+        dec[tk] = d;
+      });
+      positions.forEach((p, i) => {
+        const r = res[i];
+        if (!r || !r.ok || r.data.length < 66) return;
+        let v = BigInt(r.data.slice(0, 66));
+        if (p.proto === "v1" && v > 0n) v -= 1n;
+        const d = clean(p.token) === NATIVE ? 18 : dec[clean(p.token)];
+        const reel = Number(v) / 10 ** d;
+        p.liveZero = (v === 0n);
+        p.usdLive = p.amount > 0 ? p.usd * (reel / p.amount) : 0;
+        const node = document.querySelector('[data-live="' + p.proto + ":" + p.token + '"]');
+        if (node) {
+          node.textContent = v === 0n ? t("liveZero") : t("liveOk");
+          if (v === 0n) node.style.color = "var(--muted)";
+        }
+        const row = node && node.parentElement;
+        if (row) {
+          const tok = row.querySelector(".tok"), usd = row.querySelector(".usd");
+          if (tok) tok.textContent = fmtAmt(reel) + " " + p.symbol;
+          if (usd) usd.textContent = fmtUSD(p.usdLive);
+        }
+      });
+      lu = true;
+    } catch (e) { rate = true; }
+  }
+  if (seq !== liveSeq || !current || current.addr !== addr) return;
+  const cap = out.querySelector(".total .cap");
+  if (lu) {
+    retotal();
+    if (cap && !rate) cap.textContent = t("totalCapLive");
+  } else if (cap) {
+    cap.textContent = t("totalCapStale");
+  }
 }
 
 /* Un retrait déjà envoyé d'ici rend l'instantané trompeur : on le dit,
@@ -937,6 +996,34 @@ async function accountKind(addr, chainId) {
    toutes les lectures d'une chaîne en un seul eth_call.            */
 const MC3 = "0xca11bde05977b3631167028862be2a173976ca11";
 
+/* Lecture publique, sans wallet : les mêmes eth_call, adressés à des
+   RPC ouverts. C'est ce qui permet de relire les vrais soldes
+   automatiquement après chaque recherche.                            */
+const PUB_RPC = {
+  1:    ["https://ethereum-rpc.publicnode.com", "https://cloudflare-eth.com"],
+  8453: ["https://mainnet.base.org", "https://base-rpc.publicnode.com"],
+  10:   ["https://mainnet.optimism.io", "https://optimism-rpc.publicnode.com"],
+};
+async function pubCall(chainId, to, data) {
+  let err;
+  for (const url of PUB_RPC[chainId]) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 5000);
+    try {
+      const r = await fetch(url, { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call",
+                               params: [{ to, data }, "latest"] }),
+        signal: ctl.signal });
+      const j = await r.json();
+      if (j.result) return j.result;
+      err = j.error;
+    } catch (e) { err = e; }
+    finally { clearTimeout(timer); }
+  }
+  throw new Error("live read failed" + (err && err.message ? ": " + err.message : ""));
+}
+
 let sweepMap = null;
 function sweepCombos() {
   if (sweepMap) return sweepMap;
@@ -982,17 +1069,11 @@ function decodeAggregate3(hex) {
 
 async function liveSweep(addr) {
   const m = message(t("connecting"), null);
-  statusNode = m;
+  const seq = ++liveSeq;
   try {
-    await connected();
-    const p = await provider();
     const combosByChain = sweepCombos();
-    // commence par la chaîne courante du wallet : une bascule de moins
-    const cur = String(await ask(p, "eth_chainId", [], RPC_MS)).toLowerCase();
-    const order = [...combosByChain.keys()]
-      .sort((a, b) => (CHAIN_META[b].hex === cur) - (CHAIN_META[a].hex === cur));
     const groups = new Map(), skipped = [];
-    for (const chainId of order) {
+    for (const chainId of combosByChain.keys()) {
       const combos = combosByChain.get(chainId);
       m.textContent = t("scanChain", {name: CHAIN_META[chainId].name, n: combos.length});
       const calls = combos.map(c => balanceCall(c, addr));
@@ -1000,7 +1081,7 @@ async function liveSweep(addr) {
       for (const tk of toks) calls.push({ to: "0x" + tk, data: "0x313ce567" });  // decimals()
       let res;
       try {
-        res = decodeAggregate3(await ethCall(chainId, MC3, encodeAggregate3(calls)));
+        res = decodeAggregate3(await pubCall(chainId, MC3, encodeAggregate3(calls)));
       } catch (e) { skipped.push(CHAIN_META[chainId].name); continue; }
       const dec = {};
       toks.forEach((tk, i) => {
@@ -1022,6 +1103,7 @@ async function liveSweep(addr) {
       });
       if (found.length) groups.set(chainId, found);
     }
+    if (seq !== liveSeq || !current || current.addr !== addr) return;
     current = { addr, groups };
     const n = [...groups.values()].reduce((s, a) => s + a.length, 0);
     if (n) {
@@ -1037,7 +1119,7 @@ async function liveSweep(addr) {
   } catch (e) {
     m.textContent = (e && e.message) || String(e);
     m.classList.add("err"); m.classList.remove("ok");
-  } finally { statusNode = null; }
+  }
 }
 
 function renderSweep() {
@@ -1068,12 +1150,16 @@ function renderSweep() {
       box.appendChild(row);
     }
     const act = el("div", "chain-act");
-    const bc = el("button", "small", isDelivery()
-      ? t("deliverTo", {addr: shortAddr(current.addr)})
-      : t("claimOn", {name: meta.name}));
-    bc.addEventListener("click", () => claim(chainId, positions));
-    act.appendChild(bc);
-    act.appendChild(el("div", "note", isDelivery() ? t("deliverNote") : t("actNote")));
+    if (hasWallet()) {
+      const bc = el("button", "small", isDelivery()
+        ? t("deliverTo", {addr: shortAddr(current.addr)})
+        : t("claimOn", {name: meta.name}));
+      bc.addEventListener("click", () => claim(chainId, positions));
+      act.appendChild(bc);
+      act.appendChild(el("div", "note", isDelivery() ? t("deliverNote") : t("actNote")));
+    } else {
+      act.appendChild(el("div", "note nowallet", t("noWalletShort")));
+    }
     box.appendChild(act);
     const protos = [...new Set(positions.map(p => p.proto))];
     const links = el("div", "explorers");
@@ -1255,26 +1341,29 @@ async function histCheck(card) {
    reste réellement, et on cesse d'annoncer un montant « en attente ». */
 function retotal() {
   if (!current || !current.groups) return;
-  let restant = 0, vides = 0, vus = 0;
+  const worth = p => p.usdLive !== undefined ? p.usdLive : (p.liveZero ? 0 : p.usd);
+  let restant = 0, vides = 0;
   for (const arr of current.groups.values())
     for (const p of arr) {
-      if (p.liveZero === undefined) { restant += p.usd; continue; }
-      vus++;
-      if (p.liveZero) vides++; else restant += p.usd;
+      if (p.liveZero) vides++;
+      restant += worth(p);
     }
   const big = out.querySelector(".total .big");
-  if (big) big.textContent = fmtUSD(restant);
-  for (const [cid, arr] of current.groups)
-    if (arr.length && arr.every(p => p.liveZero)) {
-      const b = out.querySelector('button[data-claim="' + cid + '"]');
-      if (b) b.disabled = true;
-    }
+  if (big) { big.dataset.hold = "1"; big.textContent = fmtUSD(restant); }
+  for (const [cid, arr] of current.groups) {
+    const b = out.querySelector('button[data-claim="' + cid + '"]');
+    const box = b && b.closest(".chain");
+    const amt = box && box.querySelector(".chain-head .amt");
+    if (amt) amt.textContent = fmtUSD(arr.reduce((sum, p) => sum + worth(p), 0));
+    if (b && arr.length && arr.every(p => p.liveZero)) b.disabled = true;
+  }
   const lead = out.querySelector(".total .lead");
   if (lead && restant === 0 && vides) lead.textContent = t("totalLeadNone");
   if (!vides) return;
+  out.querySelectorAll(".msg.claimnote").forEach(n => n.remove());
   const tout = restant === 0;
   const m = message(t(tout ? "allClaimed" : "someClaimed"), tout ? "warn" : null, true);
-  if (m) m.scrollIntoView({behavior:"smooth", block:"nearest"});
+  if (m) { m.classList.add("claimnote"); m.scrollIntoView({behavior:"smooth", block:"nearest"}); }
 }
 
 /* ── retrait ────────────────────────────────────────────────── */

@@ -51,10 +51,15 @@ button becomes "Deliver to 0x…".
 ## How it works
 
 1. **Search** — you paste an address. The page validates its EIP-55 checksum, then
-   looks it up in an embedded snapshot. No network call, no wallet, nothing to
-   authorise.
-2. **Verify live** — an `eth_call` re-reads the real balance from the contract
-   through your own wallet's RPC. Free, read-only. That figure is the one that counts.
+   looks it up in an embedded snapshot. The lookup itself is local; no wallet, nothing
+   to authorise.
+2. **Live figures, automatically** — right after the lookup, every displayed balance
+   is re-read from the contracts in one Multicall3 `eth_call` per chain, through
+   public RPC endpoints. Amounts and totals switch from the snapshot estimate to the
+   real figure, withdrawn balances show as such, and their buttons are disabled. No
+   wallet is needed for this. If the endpoints are unreachable, the snapshot stays,
+   labelled as unverified. A *Verify live* button still lets you re-read through your
+   own wallet's RPC instead of trusting the public ones.
 3. **Claim** — the page builds one transaction per protocol. Splits V1 batches every
    token on a chain into a single `withdraw` call.
 
@@ -82,7 +87,15 @@ and never gated — on a sample of native-paying Base beneficiaries they outnumb
 real contracts, so treating them as contracts made most of the warnings wrong.
 EIP-3541 forbids any other code beginning with `0xef`, so the test is unambiguous.
 
-Both checks run only on explicit action: nothing reaches the network while you search.
+### What the page sends where
+
+The only outbound requests the page ever makes are read-only JSON-RPC `eth_call`s
+carrying the searched address, to these public endpoints: `mainnet.base.org`,
+`*.publicnode.com`, `cloudflare-eth.com`, `mainnet.optimism.io` (plus Google Fonts
+for typography). Searching an address therefore reveals it to those RPC operators —
+the same thing that happens when you look it up on any block explorer. Nothing else
+is sent to anyone: no analytics, no backend of ours. The wallet is only touched on
+explicit action, and only ever for the withdrawal itself.
 
 ### Withdrawal history
 
@@ -117,25 +130,23 @@ for Clanker v3.1, by summing what was credited to each address and subtracting w
 was withdrawn. It covers balances of **$25 and above**, as of **21 August 2026**,
 across Ethereum, Base and Optimism.
 
-Snapshots age. The *Verify live* button always re-reads the contract before any
-withdrawal, so a stale snapshot can never cause a wrong transaction.
-
-A stale figure can still mislead, though, so the page stops asserting it. Once a
-re-read shows a balance at zero, the headline total drops that position and — if
-nothing is left — stops saying money is waiting at all, saying it has been
-withdrawn instead. And if a withdrawal for the searched address is already in this
-browser's history, the search says so up front, with a link to the transaction,
-rather than presenting the snapshot as current.
+Snapshots age, so the page does not let one assert anything: balances are re-read
+live right after every search (see above), the headline total is recomputed from
+what the contracts actually hold, and a fully withdrawn address says so instead of
+announcing money that is no longer waiting. A withdrawal already in this browser's
+history is surfaced on search with a link to the transaction. The *Verify live*
+button remains as a wallet-side second opinion, so a stale snapshot can never cause
+a wrong transaction.
 
 ### Addresses the snapshot does not know
 
 An address credited after the snapshot date, or below its $25 floor, is not in the
-embedded data. Searching it offers a **live scan** instead: every protocol-token
+embedded data. Searching it runs a **live scan automatically**: every protocol-token
 pair the registry tracks (102 across the three chains) is read in a single
-`eth_call` per chain through [Multicall3](https://www.multicall3.com/), via your
-own wallet's RPC — about two seconds for full coverage, token decimals read the
-same way. Balances found this way get the same claim and deliver buttons as
-snapshot results.
+`eth_call` per chain through [Multicall3](https://www.multicall3.com/), via the same
+public RPC endpoints — about two seconds for full coverage, token decimals read the
+same way, no wallet required. Balances found this way get the same claim and deliver
+buttons as snapshot results (a wallet is needed for those, as always).
 
 The honest limit, stated in the interface: the scan covers pairs *seen in the
 snapshot*. A token that first appeared after August 21, 2026 cannot be discovered
