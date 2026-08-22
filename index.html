@@ -452,6 +452,10 @@ const I18N = {
     bannerMobileP2:"No wallet app? The contract links shown with your results still work — they open the withdraw function on the block explorer, where you can claim by hand.",
     openIn:"Open in:",
     histBtn:"⛓ Withdrawals ({n})",
+    histSeen:"You already sent a withdrawal for this address from this browser, on {when}. The figures below are the August 21, 2026 snapshot and do not reflect it — use Verify live for the real balance.",
+    totalLeadNone:"Already claimed",
+    allClaimed:"Nothing is waiting for this address any more: every balance checked reads zero in the contract. It has been withdrawn.",
+    someClaimed:"Some balances now read zero in the contract. The total above has been reduced to what is actually left.",
     histH:"Withdrawals sent from this browser",
     histP:"Every withdrawal you send from this page, with a link to the block explorer — which is the authority on whether it went through, not this list.",
     histFine:"Kept on this device only, in this browser's storage. Nothing is sent anywhere, and clearing it changes nothing onchain.",
@@ -731,6 +735,22 @@ function lookup(addrRaw) {
   }
   current = { addr, groups };
   render(total);
+  noteHistory(addr);
+}
+
+/* Un retrait déjà envoyé d'ici rend l'instantané trompeur : on le dit,
+   plutôt que d'afficher un montant « en attente » qui ne l'est plus. */
+function noteHistory(addr) {
+  const vus = histLoad().filter(r => r.a === addr);
+  if (!vus.length) return;
+  let quand = "";
+  try { quand = new Date(vus[0].t).toLocaleString(); } catch (e) {}
+  const m = el("div", "msg status warn", t("histSeen", {when: quand}));
+  const a = el("a", null, " " + t("histSeeTx"));
+  a.href = CHAIN_META[vus[0].c].scan + "/tx/" + vus[0].h;
+  a.target = "_blank"; a.rel = "noopener noreferrer";
+  m.appendChild(a);
+  out.insertBefore(m, out.children[1] || null);
 }
 
 function render(total) {
@@ -1108,12 +1128,14 @@ async function verifyLive(addr, chainId, retried) {
       const raw = await ethCall(p.chainId, to, data);
       let v = BigInt(raw || "0x0");
       if (p.proto === "v1" && v > 0n) v -= 1n;   // SplitMain laisse 1 wei par solde
+      p.liveZero = (v === 0n);
       const node = document.querySelector('[data-live="' + p.proto + ":" + p.token + '"]');
       if (node) {
         node.textContent = v === 0n ? t("liveZero") : t("liveOk");
         if (v === 0n) node.style.color = "var(--muted)";
       }
     }
+    retotal();
     m.textContent = t("readDone");
     m.classList.add("ok"); m.classList.remove("err");
 
@@ -1221,6 +1243,28 @@ async function histCheck(card) {
   const panel = document.getElementById("historypanel");
   if (panel) panel.hidden = false;
   const m = message(t("histChecked", {n}), "ok", true);
+  if (m) m.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+/* Le grand total vient de l'instantané. Dès qu'une relecture montre
+   qu'un solde est à zéro, ce chiffre ment : on le recalcule sur ce qui
+   reste réellement, et on cesse d'annoncer un montant « en attente ». */
+function retotal() {
+  if (!current || !current.groups) return;
+  let restant = 0, vides = 0, vus = 0;
+  for (const arr of current.groups.values())
+    for (const p of arr) {
+      if (p.liveZero === undefined) { restant += p.usd; continue; }
+      vus++;
+      if (p.liveZero) vides++; else restant += p.usd;
+    }
+  const big = out.querySelector(".total .big");
+  if (big) big.textContent = fmtUSD(restant);
+  const lead = out.querySelector(".total .lead");
+  if (lead && restant === 0 && vides) lead.textContent = t("totalLeadNone");
+  if (!vides) return;
+  const tout = restant === 0;
+  const m = message(t(tout ? "allClaimed" : "someClaimed"), tout ? "warn" : null, true);
   if (m) m.scrollIntoView({behavior:"smooth", block:"nearest"});
 }
 

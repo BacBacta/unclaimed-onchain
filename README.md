@@ -118,8 +118,14 @@ was withdrawn. It covers balances of **$25 and above**, as of **21 August 2026**
 across Ethereum, Base and Optimism.
 
 Snapshots age. The *Verify live* button always re-reads the contract before any
-withdrawal, so a stale snapshot can never cause a wrong transaction — at worst it
-shows an amount that has already been claimed.
+withdrawal, so a stale snapshot can never cause a wrong transaction.
+
+A stale figure can still mislead, though, so the page stops asserting it. Once a
+re-read shows a balance at zero, the headline total drops that position and — if
+nothing is left — stops saying money is waiting at all, saying it has been
+withdrawn instead. And if a withdrawal for the searched address is already in this
+browser's history, the search says so up front, with a link to the transaction,
+rather than presenting the snapshot as current.
 
 ### Addresses the snapshot does not know
 
