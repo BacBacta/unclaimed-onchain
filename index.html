@@ -62,6 +62,27 @@ a:hover{text-decoration:underline; text-underline-offset:3px}
 }
 .topbar .support:hover{border-color:var(--glass-border-2); color:var(--ink); text-decoration:none}
 
+/* ── historique des retraits ─────────────────────── */
+.topacts{display:flex; gap:8px; align-items:center}
+#historypanel{margin:26px 0 0}
+.hist{padding:20px 22px}
+.hist h4{font-family:var(--display); font-weight:700; font-size:1rem; margin:0 0 5px}
+.hist > p{margin:0 0 6px; font-size:13px; color:var(--ink-2); line-height:1.55; max-width:64ch}
+.hist > p.fine{color:var(--muted); font-size:12.5px}
+.hrow{display:grid; grid-template-columns:1fr auto auto; gap:4px 12px;
+      padding:13px 0; border-top:1px solid var(--glass-border); align-items:baseline}
+.hrow:first-of-type{border-top:0}
+.hrow .amt{font-weight:600; font-size:14.5px}
+.hrow .meta{grid-column:1/-1; font-size:11.5px; color:var(--muted);
+            font-family:var(--mono); letter-spacing:.03em; line-height:1.5}
+.hrow a{font-family:var(--mono); font-size:12px; color:var(--cyan); white-space:nowrap}
+.hrow a::after{content:" ↗"; opacity:.6}
+.hbadge{font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+        padding:3px 9px; border-radius:999px; border:1px solid var(--glass-border); color:var(--muted)}
+.hbadge.ok{color:var(--emerald); border-color:rgba(55,226,160,.4)}
+.hbadge.ko{color:var(--danger); border-color:rgba(255,107,107,.4)}
+.hacts{display:flex; gap:9px; flex-wrap:wrap; margin-top:17px}
+
 /* ── héro ────────────────────────────────────────── */
 header{padding:60px 0 0; position:relative}
 .chip{
@@ -233,6 +254,8 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
 @media (max-width:560px){
   .search,.coffee{padding:22px 18px}
   .topbar .support{display:none}
+  .topbar .histbtn{display:inline-block}
+  .hrow{grid-template-columns:1fr auto}
 }
 </style>
 </head>
@@ -244,7 +267,10 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
 
 <div class="topbar">
   <div class="brand"><span class="dot"></span> <span data-i18n="brand">Unclaimed Onchain</span></div>
-  <button class="support" id="supportlink" data-i18n="support">☕ Support</button>
+  <div class="topacts">
+    <button class="support histbtn" id="historylink" hidden></button>
+    <button class="support" id="supportlink" data-i18n="support">☕ Support</button>
+  </div>
 </div>
 
 <header>
@@ -275,6 +301,7 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
 </header>
 
 <div id="walletbanner"></div>
+<div id="historypanel" hidden></div>
 <div id="out"></div>
 
 <div class="glass edge coffee" id="coffee">
@@ -424,6 +451,17 @@ const I18N = {
     bannerMobileP:"Mobile browsers have no wallet extensions — there is nothing for this page to detect. A mobile wallet only exposes itself inside its own built-in browser. Tap your wallet below to reopen this exact page there, and everything works: search, verify, claim.",
     bannerMobileP2:"No wallet app? The contract links shown with your results still work — they open the withdraw function on the block explorer, where you can claim by hand.",
     openIn:"Open in:",
+    histBtn:"⛓ Withdrawals ({n})",
+    histH:"Withdrawals sent from this browser",
+    histP:"Every withdrawal you send from this page, with a link to the block explorer — which is the authority on whether it went through, not this list.",
+    histFine:"Kept on this device only, in this browser's storage. Nothing is sent anywhere, and clearing it changes nothing onchain.",
+    histEmpty:"No withdrawal sent from this browser yet.",
+    histClear:"Clear history", histCheck:"Check statuses onchain",
+    histSeeTx:"transaction",
+    histSent:"sent", histOk:"confirmed", histKo:"reverted",
+    histDeliver:"delivered to {addr}", histClaim:"claimed for {addr}",
+    histChecked:"{n} transaction(s) re-read from the chain.",
+    histNoWallet:"No wallet here to re-read the chain — open a transaction in the explorer instead.",
     bannerPreview:"Heads-up: this preview runs in a sandbox that blocks wallet extensions. Search works fully; claiming requires opening the page on its own domain.",
     prep:"Preparing…",
     toSign:"{n} transaction(s) to sign. Funds will go to {addr}, whoever signs.",
@@ -1096,6 +1134,96 @@ async function verifyLive(addr, chainId, retried) {
   } finally { statusNode = null; }
 }
 
+/* ── historique des retraits ────────────────────────────────────
+   Les hachages ne survivaient pas au rechargement. On les garde dans
+   le stockage du navigateur : rien ne quitte l'appareil, et la source
+   de vérité reste l'explorateur, vers lequel chaque ligne pointe.   */
+const HIST_KEY = "unclaimed-onchain.withdrawals.v1";
+function histLoad() {
+  try { const v = JSON.parse(localStorage.getItem(HIST_KEY) || "[]");
+        return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function histSave(list) {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, 200))); } catch (e) {}
+}
+function histAdd(rec) { const l = histLoad(); l.unshift(rec); histSave(l); renderHistory(); }
+
+function histLine(r) {
+  const row = el("div", "hrow");
+  const amt = (r.m && r.m.length)
+    ? r.m.map(x => fmtAmt(x.a) + " " + x.s).join(" · ")
+    : (r.l || "");
+  row.appendChild(el("div", "amt", amt));
+  const st = r.s === "ok" ? "ok" : r.s === "ko" ? "ko" : "";
+  row.appendChild(el("span", "hbadge " + st,
+    t(r.s === "ok" ? "histOk" : r.s === "ko" ? "histKo" : "histSent")));
+  const a = el("a", null, t("histSeeTx"));
+  a.href = CHAIN_META[r.c].scan + "/tx/" + r.h;
+  a.target = "_blank"; a.rel = "noopener noreferrer";
+  row.appendChild(a);
+  const qui = t(r.d ? "histDeliver" : "histClaim", {addr: shortAddr(r.a)});
+  let quand = "";
+  try { quand = new Date(r.t).toLocaleString(); } catch (e) {}
+  row.appendChild(el("div", "meta",
+    [CHAIN_META[r.c].name, qui, quand].filter(Boolean).join("  ·  ")));
+  return row;
+}
+
+function renderHistory() {
+  const list = histLoad();
+  const btn = document.getElementById("historylink");
+  const panel = document.getElementById("historypanel");
+  if (!btn || !panel) return;
+  btn.textContent = t("histBtn", {n: list.length});
+  btn.hidden = list.length === 0;
+  if (list.length === 0) { panel.hidden = true; panel.innerHTML = ""; return; }
+  const ouvert = !panel.hidden;
+  panel.innerHTML = "";
+  const card = el("div", "glass edge hist");
+  card.appendChild(el("h4", null, t("histH")));
+  card.appendChild(el("p", null, t("histP")));
+  card.appendChild(el("p", "fine", t("histFine")));
+  for (const r of list) if (CHAIN_META[r.c]) card.appendChild(histLine(r));
+  const acts = el("div", "hacts");
+  const bc = el("button", "small ghost", t("histCheck"));
+  bc.addEventListener("click", () => histCheck(card));
+  const bx = el("button", "small ghost", t("histClear"));
+  bx.addEventListener("click", () => { histSave([]); renderHistory(); });
+  acts.appendChild(bc); acts.appendChild(bx);
+  card.appendChild(acts);
+  panel.appendChild(card);
+  panel.hidden = !ouvert;
+}
+
+/* Relit les reçus sur la chaîne. Un changement de réseau par chaîne
+   concernée ; un refus n'interrompt pas les autres.                */
+async function histCheck(card) {
+  const note = el("div", "msg status");
+  card.appendChild(note);
+  if (!hasWallet()) { note.textContent = t("histNoWallet"); note.classList.add("warn"); return; }
+  const list = histLoad();
+  let n = 0;
+  for (const chainId of [...new Set(list.map(r => r.c))]) {
+    try {
+      const p = await provider();
+      await switchChain(chainId);
+      for (const r of list) {
+        if (r.c !== chainId) continue;
+        const rc = await ask(p, "eth_getTransactionReceipt", [r.h], RPC_MS);
+        if (!rc) continue;                       // encore en attente
+        r.s = rc.status === "0x1" ? "ok" : "ko";
+        n++;
+      }
+    } catch (e) { /* réseau refusé ou absent : on passe au suivant */ }
+  }
+  histSave(list);
+  renderHistory();
+  const panel = document.getElementById("historypanel");
+  if (panel) panel.hidden = false;
+  const m = message(t("histChecked", {n}), "ok", true);
+  if (m) m.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
 /* ── retrait ────────────────────────────────────────────────── */
 function withdrawTxs(chainId, positions, addr) {
   const txs = [];
@@ -1108,6 +1236,7 @@ function withdrawTxs(chainId, positions, addr) {
     const enc = encAddrArray(toks, 3).split("|");
     txs.push({
       label: "Splits V1 — " + byProto.v1.length + " solde(s) en une transaction",
+      pos: byProto.v1,
       to: C.v1,
       data: SEL.v1_withdraw + padAddr(addr) + padUint(hasEth ? 1 : 0) + enc[0] + enc[1],
     });
@@ -1115,6 +1244,7 @@ function withdrawTxs(chainId, positions, addr) {
   for (const p of byProto.v2 || []) {
     txs.push({
       label: "Splits V2 — " + p.symbol,
+      pos: [p],
       to: C.v2,
       data: callData(SEL.v2_withdraw, [padAddr(addr), padAddr(p.token)]),
     });
@@ -1122,6 +1252,7 @@ function withdrawTxs(chainId, positions, addr) {
   if (byProto.zora) {
     txs.push({
       label: "Zora — solde complet",
+      pos: byProto.zora,
       to: C.zora,
       data: callData(SEL.zora_wdFor, [padAddr(addr), padUint(0)]),
     });
@@ -1129,6 +1260,7 @@ function withdrawTxs(chainId, positions, addr) {
   for (const p of byProto.clanker || []) {
     txs.push({
       label: "Clanker — " + p.symbol,
+      pos: [p],
       to: C.clanker,
       data: callData(SEL.clanker_claim, [padAddr(addr), padAddr(p.token)]),
     });
@@ -1167,6 +1299,9 @@ async function claim(chainId, positions) {
       const hash = await ask(p, "eth_sendTransaction",
         [{ from, to: tx.to, data: tx.data }], PROMPT_MS);
       done++;
+      histAdd({ h: hash, c: chainId, a: current.addr, l: tx.label, d: isDelivery(),
+                t: Date.now(), s: "sent",
+                m: (tx.pos || []).map(x => ({ a: x.amount, s: x.symbol })) });
       const link = el("div", "msg ok");
       link.appendChild(document.createTextNode(t("sent", {label: tx.label})));
       const a = el("a", null, t("seeTx"));
@@ -1292,6 +1427,12 @@ document.getElementById("customtip").addEventListener("keydown",e=>{
 });
 document.getElementById("supportlink").addEventListener("click",()=>
   document.getElementById("coffee").scrollIntoView({behavior:"smooth",block:"start"}));
+document.getElementById("historylink").addEventListener("click",()=>{
+  const panel=document.getElementById("historypanel");
+  panel.hidden=!panel.hidden;
+  if(!panel.hidden) panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+});
+renderHistory();
 
 applyLang();
 

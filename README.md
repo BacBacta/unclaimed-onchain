@@ -84,6 +84,19 @@ EIP-3541 forbids any other code beginning with `0xef`, so the test is unambiguou
 
 Both checks run only on explicit action: nothing reaches the network while you search.
 
+### Withdrawal history
+
+Transaction hashes used to appear once and vanish on reload. A **Withdrawals**
+button in the header now opens a panel listing every withdrawal sent from this
+browser — amount, protocol, chain, beneficiary, time — each linking to the block
+explorer, which stays the authority on whether it went through. *Check statuses
+onchain* re-reads the receipts through your wallet and marks each one confirmed
+or reverted.
+
+It lives in `localStorage`: on that device, in that browser, nothing sent
+anywhere. Clearing it changes nothing onchain, and a browser that refuses
+storage simply gets no history rather than an error.
+
 ### Wallets
 
 Detection listens for EIP-6963 announcements and keeps watching `window.ethereum`
