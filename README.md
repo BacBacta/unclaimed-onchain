@@ -220,6 +220,48 @@ and offers deep links that reopen the same page in MetaMask, Coinbase Wallet,
 Trust or Phantom. They are plain links — nothing is fetched from those hosts
 unless you tap one.
 
+## Not being mistaken for the thing it warns about
+
+"You have unclaimed funds" is the most common phishing pretext in crypto, this
+site says it on purpose, and it is served from a free host. That is the profile
+wallet scanners are built to catch. It is not hypothetical: **187 `*.github.io`
+domains are already on MetaMask's blocklist**, and the ones you read there —
+`eigen-laye.github.io`, `app-eigenlayer.github.io` — are exactly this kind of
+page. Being flagged by mistake would break the site for everyone at once.
+
+`node tests/outils/reputation.js` checks the public lists and says where things
+stand:
+
+```
+  ✓  MetaMask eth-phishing-detect       absent des 106 063 entrées
+  ✓  Phantom blocklist                  absent des 2 321 entrées
+  ✓  ScamSniffer                        absent des 352 157 entrées
+```
+
+Phantom's blocklist is a public repository, so that one is directly checkable.
+Blockaid — which powers Phantom, MetaMask, Coinbase Wallet, Rainbow and Zerion —
+publishes no list; a flag there is only visible by being flagged, and disputed at
+`report.blockaid.io`.
+
+What keeps this side of the line is not a claim, it is what the file does and
+does not contain, and any reviewer can check each one in a minute:
+
+- **No `personal_sign`, `eth_sign` or `signTypedData`.** Not present in the file.
+  Those are the signatures drainers rely on.
+- **No `approve` and no `0x095ea7b3`.** Not present either. A page that never
+  asks for an allowance cannot spend anything later.
+- **One `eth_sendTransaction` call site**, and it calls a public withdraw
+  function whose beneficiary is an argument written into an immutable contract.
+- **No obfuscation**: no `eval`, no `Function(`, no `atob`, nothing minified,
+  and no script loaded from anywhere.
+- **`/.well-known/security.txt`** carries a contact and points back at the
+  source, which is this repository, in full.
+
+The honest limit: none of that prevents a false positive, it only makes one
+quick to overturn. The structural fix is a domain of its own — `github.io` is
+on the Public Suffix List, so another user's flagged page cannot contaminate
+this one, but the neighbourhood is still what a scanner weighs first.
+
 ## Data
 
 The embedded snapshot was built from onchain events (via Dune) plus a state read

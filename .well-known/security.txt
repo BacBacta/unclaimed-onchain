@@ -1,0 +1,17 @@
+# Unclaimed Onchain — https://bacbacta.github.io/unclaimed-onchain/
+#
+# This site tells people they have unclaimed funds. That sentence is also the
+# most common phishing pretext in crypto, so here is everything a reviewer or a
+# suspicious visitor needs to check it without trusting us.
+#
+# It never requests a token approval, and the only signature it ever asks for is
+# the withdrawal itself — one eth_sendTransaction call site in the whole file,
+# calling a public withdraw function with the beneficiary as its argument. It
+# holds no funds and cannot redirect any. The source is a single unminified HTML
+# file, published in full at the repository below.
+
+Contact: https://github.com/BacBacta/unclaimed-onchain/issues
+Expires: 2027-08-22T00:00:00.000Z
+Preferred-Languages: en, fr
+Canonical: https://bacbacta.github.io/unclaimed-onchain/.well-known/security.txt
+Policy: https://github.com/BacBacta/unclaimed-onchain#why-you-should-not-trust-this-site-and-how-to-verify-it-anyway
