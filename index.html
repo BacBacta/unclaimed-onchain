@@ -7,7 +7,15 @@
 <meta name="description" content="Check and claim onchain revenue you never collected on Splits, Zora and Clanker.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<!-- Feuille de polices non bloquante : sur un réseau qui filtre Google Fonts,
+     un <link rel=stylesheet> ordinaire retarde le premier rendu de tout le
+     délai d'expiration de la connexion — page blanche pendant ce temps. En
+     media="print" elle ne bloque plus rien ; les piles de repli system-ui
+     s'affichent aussitôt et les polices prennent le relais à l'arrivée. -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
 <style>
 :root{
   color-scheme: dark;
@@ -983,8 +991,15 @@ async function provider() {
 /* Une requête au wallet peut ne jamais se résoudre : extension verrouillée,
    fenêtre restée ouverte en arrière-plan, deux wallets qui se disputent la
    page. Sans borne de temps, l'interface se fige sans rien dire. */
-const RPC_MS = 20000;        // lecture silencieuse
-const PROMPT_MS = 180000;    // requête qui ouvre une fenêtre du wallet
+/* Les suites de non-régression doivent prouver que ces bornes existent, et
+   les attendre en vrai coûte trois minutes par scénario. Elles sont donc
+   surchargeables depuis la page : raccourcir un délai ne peut qu'abandonner
+   plus tôt, jamais envoyer quoi que ce soit. */
+const DELAIS = (typeof window !== "undefined" && window.__delais) || {};
+const RPC_MS = DELAIS.rpc || 20000;        // lecture silencieuse
+const PROMPT_MS = DELAIS.prompt || 180000; // requête qui ouvre une fenêtre du wallet
+const SLOW_MS = DELAIS.slow || 4000;       // avant de dire « regardez votre wallet »
+const GUET_MS = DELAIS.guet || 10000;      // fenêtre de guet d'une injection tardive
 /* Le nom de la méthode restée sans réponse est le premier élément de
    diagnostic : eth_accounts muet accuse le fournisseur lui-même, alors
    qu'un wallet_switchEthereumChain muet accuse une fenêtre non vue. */
@@ -1006,7 +1021,7 @@ function ask(p, method, params, ms, slowMsg) {
   const done = () => { clearTimeout(timer); clearTimeout(slow); };
   const req = p.request(params ? { method, params } : { method });
   // slowMsg permet à l'appelant de garder un message plus précis que le générique
-  if (limit >= PROMPT_MS) slow = setTimeout(() => setStatus(slowMsg || t("checkWallet")), 4000);
+  if (limit >= PROMPT_MS) slow = setTimeout(() => setStatus(slowMsg || t("checkWallet")), SLOW_MS);
   return Promise.race([
     req.finally(done),
     new Promise((_, rej) => {
@@ -1599,7 +1614,7 @@ if (!walletReady) {                          // laisser à l'extension le temps 
   let tries = 0;
   const poll = setInterval(() => {
     onWalletAppeared();
-    if (walletReady || ++tries > 40) clearInterval(poll);
+    if (walletReady || ++tries > GUET_MS / 250) clearInterval(poll);
   }, 250);
 }
 

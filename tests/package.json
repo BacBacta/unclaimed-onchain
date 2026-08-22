@@ -1,0 +1,12 @@
+{
+  "name": "unclaimed-onchain-tests",
+  "private": true,
+  "description": "Regression suites for index.html. The site itself has no dependencies; these do.",
+  "scripts": {
+    "test": "node run.js",
+    "test:reel": "RAPIDE=0 node run.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  }
+}
