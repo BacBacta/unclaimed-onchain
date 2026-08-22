@@ -164,6 +164,24 @@ snapshot*. A token that first appeared after August 21, 2026 cannot be discovere
 from a browser without an indexer — the explorer method above remains the
 complete check.
 
+### Splits V2 on Ethereum, rebuilt from the chain
+
+The Warehouse's whole history on Ethereum was replayed to check this: 6.36M blocks
+from its deployment at 19,451,952, 212,754 logs, yielding 15,537 (owner, token)
+pairs whose current balances were then read through Multicall3. Event signatures
+were confirmed by keccak256 rather than assumed — `Transfer` (ERC-6909) and
+`Withdraw`.
+
+All 3,297 V2/Ethereum positions the snapshot lists came back still credited, for
+$3.06M against the snapshot's $3.08M — the gap is price drift, not missing data.
+The scan added 201 positions above $0.50 (worth $1,055 in total, none above $25)
+and refreshed 2,468 amounts to their onchain values.
+
+It also found 6,970 non-zero balances across 58 tokens with no price in the
+registry's table. They are left out, since without a price they can be neither
+valued nor filtered; `v2_ethereum_onchain.csv` in the repository history lists them
+with an empty `usd` column.
+
 ### Known limits
 
 - The snapshot's dollar figures are estimates and some are badly stale — one address
