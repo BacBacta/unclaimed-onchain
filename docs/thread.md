@@ -18,7 +18,7 @@ the limit. Post 1/ then reply each next one to the previous.
 ---
 
 **1/**
-Four contracts are quietly holding ~$7.8M that belongs to ~121,000 addresses.
+Four contracts are quietly holding ~$8.3M that belongs to ~121,700 addresses.
 
 Not stolen. Not lost. Just never collected.
 
