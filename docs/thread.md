@@ -1,5 +1,17 @@
 # Launch thread — paste one block per tweet
 
+Images live in `docs/media/`. Attach one to these three tweets and leave the
+rest as text: a thread that alternates dense text with an occasional visual
+reads as research, one that is all cards reads as an ad.
+
+| Tweet | Image | Why this one |
+|---|---|---|
+| **1** | `media/tweet-1-accroche.png` | the hook, with the live panel as proof it runs |
+| **4** | `media/tweet-4-qui-retire.png` | the 86/14 finding — a number is remembered as a picture |
+| **6** | `media/tweet-6-livraisons.png` | the two deliveries, cost beside amount |
+
+All three are 2400×1350 (16:9), which X shows full-width without cropping.
+
 Links count as 23 chars on X regardless of length. Every tweet below is under
 the limit. Post 1/ then reply each next one to the previous.
 

@@ -2,3 +2,6 @@
 node_modules
 *.log
 *.png
+# les captures de débogage restent ignorées ; les visuels du fil, non
+!docs/media/
+!docs/media/*.png
