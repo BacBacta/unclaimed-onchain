@@ -31,11 +31,11 @@ They take the beneficiary as an argument and pay THAT address. Anyone can pay th
 ---
 
 **4/**
-So why does it sit there? Not ignorance — incentives.
+Why does it sit there? Partly, people don't know it's owed to them.
 
-I traced every V2 withdrawal on Ethereum: 86% are people collecting their OWN money. Only 14% is someone paying gas to deliver a stranger's.
+But when someone could deliver it, they rarely do. I traced every V2 withdrawal on Ethereum: 86% are people taking their own money. Only 14% is moving a stranger's.
 
-Nobody's paid to move what isn't theirs. So it doesn't move.
+Nobody's paid to — so almost nobody does.
 
 ---
 
