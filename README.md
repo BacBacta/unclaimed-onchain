@@ -50,6 +50,34 @@ an argument and send that beneficiary their funds. So anyone can pay the gas to
 The site supports this: search any address, connect a different wallet, and the
 button becomes "Deliver to 0x…".
 
+### It has been done twice, with real money
+
+Not a thought experiment. Two deliveries, on two chains, through two protocols,
+each to a stranger who never asked and could not have stopped it. In both the
+signer paid the gas and received nothing; in both the transaction carried
+**zero value**, because the page does not send funds — it calls a function whose
+beneficiary is an argument.
+
+| | Base | Ethereum |
+|---|---|---|
+| Transaction | [`0xd7c45f12…5acd47`](https://basescan.org/tx/0xd7c45f12de88330ad0ca4c84dbbddf160b668a81c4ed932195bcbe440e5acd47) | [`0x5ab31a1b…4bfe6e`](https://etherscan.io/tx/0x5ab31a1b0b8a1001f4db60b3ffcb9af33abb59b8b1e397974918f4aa284bfe6e) |
+| When | 22 Aug 2026, block 50,300,831 | 23 Aug 2026, block 25,817,367 |
+| Contract | Zora Protocol Rewards | Splits V2 Warehouse |
+| Function | `withdrawFor(to, amount)` — `0xdb518db2` | `withdraw(owner, token)` — `0xf940e385` |
+| Signer, who paid | `0x647d4CF9…e2aa6` | `0xA5aD3569…C5D8bE` |
+| Beneficiary, who was paid | `0x7229Bace…0c926a` | `0x4d0291cB…a58770` |
+| Delivered | 18,594,384,996,557,781 wei ≈ $44.89 | 262.50 AZTEC ≈ $3.66 |
+| Value sent by the page | 0 | 0 |
+| Cost to the signer | 275,386,409,637 wei ≈ **$0.00067** | 68,739 gas @ 0.592 gwei ≈ **$0.098** |
+| Cost as a share of what moved | 0.0015 % | 2.7 % |
+
+The second figure is the honest one to look at. On Base, delivering forty-five
+dollars cost two thousandths of a cent. On Ethereum, three dollars and sixty-six
+cents cost ten cents to move — cheap, but not free, and on a smaller balance the
+gas would have eaten it. Whether that trade is worth making is the beneficiary's
+call, or the deliverer's, which is why this registry sets no floor on what it
+will show.
+
 ---
 
 ## How it works
