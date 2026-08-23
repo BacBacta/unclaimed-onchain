@@ -1,0 +1,66 @@
+<!doctype html><meta charset=utf-8>
+<style>
+  *{margin:0;box-sizing:border-box}
+  html,body{width:1600px;height:900px}
+  body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1300px 800px at 50% -10%, #14243f 0%, #0B0D13 58%, #07080C 100%);
+    color:#E8ECF4; overflow:hidden; padding:72px 84px;
+    display:flex; flex-direction:column; justify-content:space-between}
+
+  .head{display:flex; justify-content:space-between; align-items:baseline}
+  .k{font-family:"DejaVu Sans Mono",ui-monospace,monospace; font-size:20px; letter-spacing:.34em;
+    text-transform:uppercase; color:#5AC8E8}
+  .cap{font-family:"DejaVu Sans Mono",ui-monospace,monospace; font-size:17px; letter-spacing:.22em;
+    text-transform:uppercase; color:#6f7b8d}
+
+  .rows{display:flex; flex-direction:column; gap:26px; margin:44px 0}
+  .row{display:grid; grid-template-columns:400px 1fr 330px; gap:44px; align-items:center;
+    padding:26px 34px; border-radius:18px;
+    background:rgba(255,255,255,.028); border:1px solid rgba(255,255,255,.07)}
+  .nom{font-size:50px; font-weight:800; letter-spacing:-.015em; line-height:1}
+  .chaines{font-family:"DejaVu Sans Mono",ui-monospace,monospace; font-size:24px; color:#8b96a8; margin-top:12px}
+  .piste{height:16px; border-radius:8px; background:rgba(255,255,255,.055); overflow:hidden}
+  .barre{height:100%; border-radius:8px;
+    background:linear-gradient(90deg, #1e8f68, #3ddb9f)}
+  .usd{font-size:58px; font-weight:800; letter-spacing:-.02em; text-align:right; color:#3ddb9f; line-height:1}
+  .adr{font-size:25px; color:#AEB9CC; text-align:right; margin-top:12px}
+  .adr b{color:#E8ECF4; font-weight:700}
+
+  .foot{display:flex; justify-content:space-between; align-items:center;
+    font-family:"DejaVu Sans Mono",ui-monospace,monospace; font-size:21px; color:#8b96a8}
+  .gauche{display:flex; align-items:center; gap:14px; color:#c4cddb}
+  .dot{width:9px;height:9px;border-radius:50%;background:#3ddb9f;box-shadow:0 0 14px #3ddb9f}
+</style>
+
+<div class="head">
+  <div class="k">Unclaimed · Onchain</div>
+  <div class="cap">Four contracts · Three chains · Still credited</div>
+</div>
+
+<div class="rows">
+  <div class="row">
+    <div><div class="nom">Splits V2</div><div class="chaines">Ethereum · Base · Optimism</div></div>
+    <div class="piste"><div class="barre" style="width:100%"></div></div>
+    <div><div class="usd">$3.33M</div><div class="adr"><b>2,133</b> addresses</div></div>
+  </div>
+  <div class="row">
+    <div><div class="nom">Splits V1</div><div class="chaines">Ethereum · Base</div></div>
+    <div class="piste"><div class="barre" style="width:98%"></div></div>
+    <div><div class="usd">$3.28M</div><div class="adr"><b>3,554</b> addresses</div></div>
+  </div>
+  <div class="row">
+    <div><div class="nom">Clanker</div><div class="chaines">Base</div></div>
+    <div class="piste"><div class="barre" style="width:29%"></div></div>
+    <div><div class="usd">$970k</div><div class="adr"><b>8,858</b> addresses</div></div>
+  </div>
+  <div class="row">
+    <div><div class="nom">Zora</div><div class="chaines">Base</div></div>
+    <div class="piste"><div class="barre" style="width:6%"></div></div>
+    <div><div class="usd">$204k</div><div class="adr"><b>14,001</b> addresses</div></div>
+  </div>
+</div>
+
+<div class="foot">
+  <div class="gauche"><span class="dot"></span> unclaimed-onchain.xyz</div>
+  <div>positions above $0.50 &#183; snapshot 21&#8211;22 Aug 2026 &#183; re-checked live on every search</div>
+</div>

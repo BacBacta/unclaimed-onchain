@@ -6,7 +6,7 @@ reads as research, one that is all cards reads as an ad.
 
 | Tweet | Image | Why this one |
 |---|---|---|
-| **1** | `media/tweet-1-accroche.png` | the hook, with the live panel as proof it runs |
+| **1** | `media/ad-protocoles.png` | four named protocols, amounts legible at feed width — the recognition trigger |
 | **3** | `media/tweet-4-qui-retire.png` | the 86/14 finding — a number is remembered as a picture |
 | **4** | `media/tweet-6-livraisons.png` | the two deliveries, cost beside amount |
 
