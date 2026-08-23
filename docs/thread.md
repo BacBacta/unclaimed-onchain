@@ -56,8 +56,8 @@ Both carry ZERO value. The page can't redirect a cent.
 ---
 
 **5/**
-"You have unclaimed funds" is the oldest scam line in crypto — so check it without me. The four contracts are in the README, call withdraw() from Etherscan:
+"You have unclaimed funds" is the oldest scam line in crypto. So don't take my word for it. Every contract address is in here — check yours on Etherscan and skip my site:
 https://github.com/BacBacta/unclaimed-onchain
 
-Or search any address, no wallet needed:
+Or just look up an address. No wallet, no connecting:
 https://unclaimed-onchain.xyz
