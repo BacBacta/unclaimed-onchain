@@ -379,8 +379,30 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-To deploy, drop `index.html` on Netlify, Vercel, Cloudflare Pages, GitHub Pages or
-IPFS. Before you do, set your tip address at the top of the script:
+It is served from Vercel, with GitHub Pages kept as a mirror of the same commit.
+`vercel.json` is what makes the headers real, and headers are the reason for the
+move: GitHub Pages sets none — it returns `strict-transport-security` and
+nothing else, so the Content-Security-Policy below cannot exist there.
+
+```
+content-security-policy: default-src 'none'; script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com; img-src 'self' data:;
+  connect-src <the six RPC endpoints listed above>;
+  frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+```
+
+That `connect-src` is the point. "The only outbound requests are to these
+endpoints" stops being a promise in a README and becomes something the browser
+enforces: a script trying to reach anywhere else is blocked, whatever put it
+there. It was verified against production rather than assumed — the live policy
+was pulled from the response headers, replayed against the live bytes, and the
+search, the live sweep, the activity feed and the QR all work under it with zero
+violations.
+
+The site works on any static host — drop `index.html` on Netlify, Cloudflare
+Pages, GitHub Pages or IPFS — but only a host that sets headers gives you the
+policy above. Before deploying, set your tip address at the top of the script:
 
 ```js
 const TIP_ADDRESS = "0x0000000000000000000000000000000000000000"; // ← your address
