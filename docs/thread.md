@@ -27,9 +27,9 @@ I indexed all of it and replayed the chains to check it. 🧵
 ---
 
 **2/**
-The "pull" model: Splits, Zora and Clanker credit your revenue share to your address inside the contract — it sits there until someone calls withdraw().
+Here's why. Splits, Zora and Clanker never send your share — they park it under your address and wait for someone to ask for it.
 
-Those withdraw functions have NO access control. They pay the beneficiary named in the argument. Anyone can call them.
+And the button that asks isn't locked. It pays whoever the money belongs to, not whoever presses it. So anyone can press it, for anyone.
 
 ---
 
