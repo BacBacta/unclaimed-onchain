@@ -103,7 +103,14 @@ today's balance is. Keep new assertions on that side of the line.
 
 ## `outils/`
 
-Diagnostics, not tests: they print what the page does under a given wallet stub
+`csp.js` regenerates the Content-Security-Policy hashes in `vercel.json` from
+the page's inline scripts, and `--check` verifies they match — `test_csp.js`
+runs that check, so a script edited without regenerating fails a suite rather
+than blanking the site in production. `reputation.js` queries the public
+blocklists; `integrite.js` compares the bytes served by the domain, the mirror
+and the repository.
+
+The rest are diagnostics, not tests: they print what the page does under a given wallet stub
 and never fail. `diag.js` dumps provider state under a mute, a triple and an
 absent wallet; `apres_snapshot.js` shows what an address outside the snapshot
 gets offered; `site.js` dumps banner, buttons and results against a deployed

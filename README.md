@@ -300,7 +300,9 @@ extensions — 7,502 entries on MetaMask's list, 34,523 on ScamSniffer's, agains
 a share of the world's registrations nowhere near that. It was chosen knowing
 that. It is one signal among several, and the ones above are the counterweight:
 what the file does, what it never asks for, and a source anyone can read in
-full. `node tests/outils/reputation.js` watches both addresses.
+full. `node tests/outils/reputation.js` watches both addresses, and
+`node tests/outils/integrite.js` checks that the deployed bytes still match the
+source.
 
 ### Making the network contract enforceable
 
@@ -420,10 +422,43 @@ content-security-policy: default-src 'none'; script-src 'self' 'unsafe-inline';
   frame-ancestors 'none'; base-uri 'none'; form-action 'none'
 ```
 
+`script-src` carries no `'unsafe-inline'`: each inline block is allowed by its
+SHA-256 and nothing else. An injected script has the wrong hash and does not
+run, whatever got it onto the page — which is what makes the directive worth
+having rather than decorative. It costs a regeneration step, so
+`tests/outils/csp.js` rewrites the hashes and `--check` verifies them; a suite
+fails if they drift, instead of the site going blank in production. The one
+inline `onload=` attribute the page had is gone for the same reason: a handler
+attribute forces `'unsafe-inline'` back on.
+
+`style-src` still allows inline styles, and that is deliberate rather than
+overlooked: the page uses `style="…"` attributes, which hashes cannot cover.
+Injected CSS is a far smaller problem than injected script, but the gap is real
+and worth naming.
+
 That `connect-src` is the point. "The only outbound requests are to these
 endpoints" stops being a promise in a README and becomes something the browser
 enforces: a script trying to reach anywhere else is blocked, whatever put it
-there. It was verified against production rather than assumed — the live policy
+there.
+
+### Checking that the site you loaded is the code above
+
+The weakest part of this project is not its code, it is whatever puts that code
+online: anyone holding the repository or the hosting account can rewrite the
+page, and no amount of care inside the file prevents that.
+
+What it does instead is make a change detectable by anyone, not just by us. The
+same commit is served by two independent hosts and readable in a public
+repository, so all three must return identical bytes:
+
+```bash
+node tests/outils/integrite.js
+```
+
+An attacker who compromises one is visible; going unnoticed takes all three. No
+hash is published anywhere, so nothing goes stale — the check compares the
+sources against each other. A lagging deploy produces the same divergence as an
+attack, so read the result before concluding. It was verified against production rather than assumed — the live policy
 was pulled from the response headers, replayed against the live bytes, and the
 search, the live sweep, the activity feed and the QR all work under it with zero
 violations.

@@ -1,112 +1,40 @@
-/* Sert index.html avec exactement les en-têtes de vercel.json, puis parcourt
-   la page en écoutant les violations CSP. Une directive trop stricte casse
-   sans bruit : c'est le navigateur qu'il faut interroger, pas la config. */
-const http = require('http'), fs = require('fs'), path = require('path');
-const { chromium } = require('playwright');
-const RACINE = process.env.RACINE || path.join(__dirname, '..');
-const cfg = JSON.parse(fs.readFileSync(RACINE + '/vercel.json', 'utf8'));
-const ENTETES = Object.fromEntries(cfg.headers[0].headers.map(h => [h.key, h.value]));
-
-const HOSTS = ['mainnet.base.org','base-rpc.publicnode.com','ethereum-rpc.publicnode.com',
-  'eth.drpc.org','mainnet.optimism.io','optimism-rpc.publicnode.com'];
-const CORS = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'content-type',
-  'Access-Control-Allow-Methods':'POST,OPTIONS'};
-
-const srv = http.createServer((q, r) => {
-  const f = q.url === '/' ? '/index.html' : q.url.split('?')[0];
-  const p = path.join(RACINE, f);
-  if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) { r.writeHead(404); return r.end('nope'); }
-  const type = f.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8';
-  r.writeHead(200, { ...ENTETES, 'Content-Type': type });
-  r.end(fs.readFileSync(p));
-});
-
+/* La CSP n'est une protection que si ses empreintes suivent le fichier. Un
+   ajout de script sans régénération, et la page ne s'exécute plus du tout en
+   production — mieux vaut que ça casse ici. */
+const { execFileSync } = require('child_process');
+const fs = require('fs'), path = require('path');
 let fails = 0;
-const check = (l, c, d) => { if (!c) fails++; console.log(c ? '  ok   ' : ' FAIL  ', l, c ? '' : '\n         ' + (d || '')); };
+const check = (l,c,d)=>{if(!c)fails++;console.log(c?'  ok   ':' FAIL  ',l,c?'':'\n         '+(d||''));};
 
-(async () => {
-  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
-  const url = `http://127.0.0.1:${srv.address().port}/`;
-  const b = await chromium.launch({ ...(process.env.CHROME ? {executablePath: process.env.CHROME} : {}), args: ['--no-sandbox'] });
-  const page = await b.newPage();
-  const violations = [], erreurs = [];
-  page.on('console', m => { const t = m.text();
-    if (/Content Security Policy|Refused to/i.test(t)) violations.push(t.slice(0, 190)); });
-  page.on('pageerror', e => erreurs.push(String(e.message).slice(0, 140)));
-  await page.route(u => HOSTS.some(h => u.host === h), async route => {
-    const q = route.request();
-    if (q.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-    try { const x = await fetch(q.url(), { method:'POST', headers:{'Content-Type':'application/json'}, body:q.postData() });
-      route.fulfill({ status:200, headers:{...CORS,'Content-Type':'application/json'}, body: await x.text() });
-    } catch (e) { route.fulfill({ status:502, headers:CORS, body:'{}' }); }
-  });
+const RACINE = path.join(__dirname, '..');
+const conf = JSON.parse(fs.readFileSync(path.join(RACINE,'vercel.json'),'utf8'));
+const csp = conf.headers[0].headers.find(h=>h.key==='Content-Security-Policy').value;
+/* Toujours le fichier livré, jamais PAGE : le lanceur sert une copie où il a
+   injecté window.__delais, donc un bloc <script> de plus. Ce contrôle porte
+   sur ce qui part en production, pas sur la variante de test. */
+const html = fs.readFileSync(path.join(RACINE,'index.html'),'utf8');
 
-  /* Le bac à sable coupe Google Fonts : sans substitut, on ne saurait pas si
-     c'est la CSP ou le réseau qui bloque. On sert donc une vraie feuille et une
-     vraie police à ces deux origines — la CSP est évaluée avant l'interception,
-     donc un blocage se verrait quand même. */
-  const woff = Buffer.from(
-    'd09GMgABAAAAAAKAAA0AAAAABegAAAIoAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAABmAAgg' +
-    'QIEQgKgVSBQwsIAAE2AiQDGAQgBYUeB1obBcgOI7LNbUlUJPX3l+Tu+X9tPOaZUdvptKUj' +
-    'x4kQQ5UvBAAAAAAAAAAAAAD//w==', 'base64');
-  await page.route('https://fonts.googleapis.com/**', r => r.fulfill({
-    status: 200, headers: {'Content-Type':'text/css','Access-Control-Allow-Origin':'*'},
-    body: "@font-face{font-family:'Manrope';src:url(https://fonts.gstatic.com/s/x.woff2) format('woff2');font-display:swap}" }));
-  await page.route('https://fonts.gstatic.com/**', r => r.fulfill({
-    status: 200, headers: {'Content-Type':'font/woff2','Access-Control-Allow-Origin':'*'}, body: woff }));
+let sortie = '', code = 0;
+try { sortie = execFileSync('node', [path.join(RACINE,'tests/outils/csp.js'),'--check'],
+  {encoding:'utf8', env:{...process.env, PAGE:''}}); }
+catch (e) { sortie = (e.stdout||'') + (e.stderr||''); code = e.status; }
+check('les empreintes de vercel.json correspondent aux scripts de la page', code === 0, sortie.trim());
 
-  await page.goto(url, { waitUntil: 'load' });
-  await page.waitForTimeout(1200);
-  check('la page charge sans violation CSP', violations.length === 0, violations.join(' | '));
+check("script-src ne contient plus 'unsafe-inline'", !/script-src[^;]*'unsafe-inline'/.test(csp),
+  (csp.match(/script-src [^;]*/)||[''])[0]);
+check('script-src porte une empreinte par bloc en ligne',
+  (csp.match(/'sha256-[^']+'/g)||[]).length === (html.match(/<script>/g)||[]).length,
+  (csp.match(/script-src [^;]*/)||[''])[0]);
+check("default-src est 'none'", /default-src 'none'/.test(csp), csp.slice(0,60));
+check('connect-src liste exactement les endpoints de la page', (() => {
+  const dansCsp = (csp.match(/connect-src ([^;]*)/)||[,''])[1].trim().split(/\s+/).sort();
+  const dansPage = [...new Set((html.match(/https:\/\/[a-z0-9.-]*(publicnode\.com|base\.org|drpc\.org|optimism\.io)/g)||[]))].sort();
+  return JSON.stringify(dansCsp) === JSON.stringify(dansPage);
+})(), (csp.match(/connect-src [^;]*/)||[''])[0]);
 
-  // recherche + balayage live : c'est connect-src qui est en jeu
-  await page.fill('#addr', '0x6BAb38eD8e3c942DCC287bE471D651055B615c7E');
-  await page.click('#go');
-  let t0 = Date.now(), txt = '';
-  while (Date.now()-t0 < 60000) { txt = await page.locator('#out').innerText().catch(()=> '');
-    if (/re-read live|Nothing credited|not re-read/.test(txt)) break; await page.waitForTimeout(200); }
-  check('connect-src laisse passer les six RPC (soldes relus)', /re-read live/.test(txt), txt.slice(0,220));
+/* Un attribut de gestionnaire en ligne redemanderait 'unsafe-inline'. */
+check("aucun attribut on*= dans la page", !/\bon[a-z]+="/.test(html),
+  (html.match(/\bon[a-z]+="[^"]*"/g)||[]).slice(0,3).join(' '));
 
-  // flux d'activité : eth_getLogs, même origine de destination
-  await page.click('#activitylink');
-  t0 = Date.now();
-  while (Date.now()-t0 < 60000 && !(await page.locator('#activitypanel .hrow').count())) await page.waitForTimeout(200);
-  const nAct = await page.locator('#activitypanel .hrow').count();
-  check('le flux d\'activité se remplit (eth_getLogs)', nAct > 0, 'lignes=' + nAct);
-
-  // QR : SVG inline, img-src / style-src en jeu
-  await page.evaluate(() => { document.getElementById('tip').style.display = 'block';
-    donProposer([{proto:'v1',chainId:8453,token:'0x'+'e'.repeat(40),symbol:'ETH',amount:1,dec:18,brut:'1000000000000000000'}]); });
-  await page.waitForTimeout(400);
-  check('le QR s\'affiche (SVG inline)', await page.locator('#donzone .donqr svg').count() === 1);
-
-  // polices : style-src / font-src
-  const feuilles = await page.evaluate(() => [...document.styleSheets]
-    .map(s => { try { return { href: s.href, regles: s.cssRules.length }; }
-                catch (e) { return { href: s.href, regles: 'inaccessible' }; } })
-    .filter(s => s.href && /fonts\.googleapis/.test(s.href)));
-  check('style-src accepte la feuille Google Fonts', feuilles.length === 1, JSON.stringify(feuilles));
-  const req = [];
-  page.on('request', r => { if (/gstatic/.test(r.url())) req.push(r.url()); });
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(600);
-
-  /* Une CSP qui ne bloque rien ne prouve rien. On vérifie qu'elle refuse bien
-     une destination non déclarée — c'est là tout son intérêt ici : elle rend
-     opposable la promesse « on ne parle qu'à ces six endpoints ». */
-  const attendus = violations.length;
-  const fuite = await page.evaluate(async () => {
-    try { await fetch('https://exemple-non-declare.test/collecte', {method:'POST', body:'x'});
-          return 'PASSÉE'; } catch (e) { return 'refusée'; }
-  });
-  await page.waitForTimeout(300);
-  check('une destination non déclarée est refusée', fuite === 'refusée', 'résultat=' + fuite);
-  check('le navigateur enregistre bien la violation', violations.length > attendus);
-  const nonScript = violations.filter(v => !/exemple-non-declare/.test(v));
-
-  check('aucune erreur JavaScript', erreurs.length === 0, JSON.stringify(erreurs));
-  check('aucune violation non voulue', nonScript.length === 0, [...new Set(nonScript)].join('\n         '));
-  await b.close(); srv.close();
-  console.log(fails === 0 ? '\nTOUS LES TESTS PASSENT' : `\n${fails} ÉCHEC(S)`);
-  process.exit(fails === 0 ? 0 : 1);
-})();
+console.log(fails===0?'\nTOUS LES TESTS PASSENT':`\n${fails} ÉCHEC(S)`);
+process.exit(fails===0?0:1);

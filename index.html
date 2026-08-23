@@ -12,7 +12,7 @@
      délai d'expiration de la connexion — page blanche pendant ce temps. En
      media="print" elle ne bloque plus rien ; les piles de repli system-ui
      s'affichent aussitôt et les polices prennent le relais à l'arrivée. -->
-<link rel="stylesheet" media="print" onload="this.media='all'"
+<link rel="stylesheet" media="print" data-swap
       href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <noscript><link rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
@@ -402,6 +402,17 @@ footer p{margin:0 0 8px; font-size:12.5px; color:var(--muted); max-width:64ch}
 </div>
 
 <script>
+/* La feuille de polices est chargée en media="print" pour ne pas bloquer le
+   premier rendu, puis rebasculée en "all" une fois arrivée. C'était un
+   onload= dans la balise ; un attribut de gestionnaire oblige la CSP à
+   autoriser 'unsafe-inline' sur les scripts, ce qui vide la directive de son
+   sens. Ici on couvre aussi le cas où la feuille est déjà là quand ce script
+   s'exécute : l'événement load serait alors passé. */
+for (const l of document.querySelectorAll('link[data-swap]')) {
+  const basculer = () => { l.media = "all"; };
+  if (l.sheet) basculer(); else l.addEventListener("load", basculer, {once: true});
+}
+
 /* ── internationalisation ────────────────────────────────────── */
 const I18N = {
   en: {
@@ -2256,7 +2267,14 @@ if (!walletReady) {                          // laisser à l'extension le temps 
    rouvrir la page là-bas — c'est ce que font ces liens profonds.     */
 const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
 function walletDeepLinks() {
-  const href = location.href, hostPath = location.host + location.pathname + location.search;
+  /* metamask.app.link/dapp/ attend une URL non encodée, donc on ne peut pas
+     l'encoder comme les trois autres. On reconstruit alors la query depuis la
+     seule valeur que la page utilise, validée, plutôt que de relayer ce que
+     l'adresse d'origine contenait. */
+  const a = new URLSearchParams(location.search).get("a");
+  const q = a && /^(0x)?[0-9a-fA-F]{40}$/.test(a.trim()) ? "?a=" + toChecksum(clean(a.trim())) : "";
+  const href = location.origin + location.pathname + q;
+  const hostPath = location.host + location.pathname + q;
   return [
     ["MetaMask", "https://metamask.app.link/dapp/" + hostPath],
     ["Coinbase Wallet", "https://go.cb-w.com/dapp?cb_url=" + encodeURIComponent(href)],
