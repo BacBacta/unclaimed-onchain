@@ -1,4 +1,24 @@
-# Unclaimed Onchain — proactive submission to Blockaid
+# Keeping wallets from flagging this site
+
+Three scanners matter, and only one of them takes a submission before anything
+has gone wrong. The other two are appeals: nothing to do today, everything
+ready for the day it happens.
+
+| | route | when |
+|---|---|---|
+| **Blockaid** — powers Phantom, MetaMask, Coinbase Wallet, Rainbow, Zerion | https://report.blockaid.io/verifiedProject | **now** — "verify a project to prevent false malicious flags" |
+| **ChainPatrol** | https://app.chainpatrol.io/dispute | only once flagged; owner-submitted only |
+| **MetaMask** `eth-phishing-detect` | issue or PR on the repo | only once blocked |
+
+Why the domain is blocked, if it ever is:
+https://app.chainpatrol.io/search — the tool MetaMask's own README points to.
+
+Monitoring: `node tests/outils/reputation.js` checks the three public lists for
+both addresses.
+
+---
+
+## Blockaid — proactive submission
 
 **Site:** https://unclaimed-onchain.xyz/
 **Mirror:** https://bacbacta.github.io/unclaimed-onchain/ (same commit)
@@ -56,3 +76,60 @@ Absent from MetaMask eth-phishing-detect, Phantom's blocklist and ScamSniffer.
 ## Contact
 
 https://github.com/BacBacta/unclaimed-onchain/issues
+
+
+---
+
+## ChainPatrol — dispute (only if flagged)
+
+Form at https://app.chainpatrol.io/dispute. Fields: **URL** (required),
+**Email address** (required), **Additional details** (optional). It states that
+only submissions from the domain owner or an authorized representative are
+considered.
+
+Paste the short version below into *Additional details*.
+
+---
+
+## MetaMask — if the domain lands on eth-phishing-detect
+
+There is no proactive route: CONTRIBUTING states external contributors add to
+the **blocklist**, and the allowlist exists to stop fuzzy-matching false
+positives, not to pre-register sites. So this is for the day the domain is
+actually blocked.
+
+Open an issue at https://github.com/MetaMask/eth-phishing-detect/issues, or a
+PR removing the entry:
+
+```bash
+yarn remove:blocklist unclaimed-onchain.xyz
+```
+
+Their audit command shows which PR added a domain, which is worth quoting in
+the issue:
+
+```bash
+git log -S "unclaimed-onchain.xyz" -- src/config.json
+```
+
+---
+
+## Short version (fits any of the three forms)
+
+```
+Public registry of unclaimed protocol revenue. Source, unminified, single
+HTML file: https://github.com/BacBacta/unclaimed-onchain
+
+No token approval (no `approve`, no 0x095ea7b3 in the file), no personal_sign
+/ eth_sign / signTypedData, exactly one eth_sendTransaction call site — the
+withdrawal itself, calling a permissionless withdraw whose beneficiary is an
+argument written into an immutable contract. The site holds no funds and
+cannot redirect any.
+
+Production CSP sets default-src 'none' and limits connect-src to six public
+RPC endpoints:
+  curl -sI https://unclaimed-onchain.xyz/ | grep -i content-security-policy
+
+Mirror: https://bacbacta.github.io/unclaimed-onchain/ (same commit)
+security.txt: https://unclaimed-onchain.xyz/.well-known/security.txt
+```
