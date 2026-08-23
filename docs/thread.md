@@ -31,11 +31,11 @@ They take the beneficiary as an argument and pay THAT address. Anyone can pay th
 ---
 
 **4/**
-And it's not hypothetical. I measured one window on Ethereum:
+So why does it sit there? Not ignorance — incentives.
 
-110 of the last 111 Splits V2 withdrawals were sent by someone other than the beneficiary.
+I traced every V2 withdrawal on Ethereum: 86% are people collecting their OWN money. Only 14% is someone paying gas to deliver a stranger's.
 
-Permissionless delivery isn't a thought experiment. It's already most of the traffic.
+Nobody's paid to move what isn't theirs. So it doesn't move.
 
 ---
 
