@@ -326,8 +326,9 @@ because a policy that blocks nothing proves nothing.
 
 The embedded snapshot was built from onchain events (via Dune) plus a state read
 for Clanker v3.1, by summing what was credited to each address and subtracting what
-was withdrawn. It lists **27,630 addresses down to $0.50**, as of **21–22 August
-2026**, across Ethereum, Base and Optimism.
+was withdrawn. It lists **28,088 addresses down to $0.50** — 34,295 positions
+across 133 tokens, worth $7.78M — as of **21–22 August 2026**, across Ethereum,
+Base and Optimism.
 
 There is no floor worth defending: withdrawing costs about $0.001 on Base and $0.02
 on Ethereum at current gas, so whether $3 is worth collecting is the beneficiary's
