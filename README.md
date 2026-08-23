@@ -260,7 +260,28 @@ does not contain, and any reviewer can check each one in a minute:
 The honest limit: none of that prevents a false positive, it only makes one
 quick to overturn. The structural fix is a domain of its own — `github.io` is
 on the Public Suffix List, so another user's flagged page cannot contaminate
-this one, but the neighbourhood is still what a scanner weighs first.
+this one, but the neighbourhood is still what a scanner weighs first. Moving to
+another free host would make that worse, not better: 187 `*.github.io` domains
+are blocked, against 2,023 on `*.vercel.app`, 3,193 on `*.netlify.app` and
+6,909 on `*.pages.dev`.
+
+### Making the network contract enforceable
+
+"The only outbound requests are to these six endpoints" is a promise the README
+makes and the browser can be made to keep. `vercel.json` carries a
+Content-Security-Policy whose `connect-src` lists exactly those endpoints, with
+`default-src 'none'` under it, so a request anywhere else is refused by the
+browser rather than merely absent from the code.
+
+It is not active on GitHub Pages, which serves no configurable headers at all —
+only `strict-transport-security`, as `curl -I` will show. That, rather than
+reputation, is the argument for hosting this elsewhere; the `netlify.toml` in
+this repository has never done anything either.
+
+`test_csp.js` serves the file under exactly those headers and drives the whole
+page through them: the live sweep, the activity feed, the QR, the font
+stylesheet. It also asserts the policy refuses a request to an undeclared host,
+because a policy that blocks nothing proves nothing.
 
 ## Data
 
