@@ -6,7 +6,8 @@
    Cet outil interroge les listes publiques. Il ne corrige rien : il dit où on
    en est, pour qu'on l'apprenne avant les utilisateurs.                     */
 
-const DOMAINE = process.argv[2] || 'bacbacta.github.io';
+const DOMAINES = process.argv.slice(2).length ? process.argv.slice(2)
+  : ['unclaimed-onchain.xyz', 'bacbacta.github.io'];
 
 const SOURCES = [
   { nom: 'MetaMask eth-phishing-detect',
@@ -36,10 +37,21 @@ const SANS_LISTE = [
   ['Google Safe Browsing', 'https://safebrowsing.google.com/safebrowsing/report_error/'],
 ];
 
-const parent = d => d.split('.').slice(-2).join('.');
+/* Le « voisinage » est le suffixe partagé avec d'autres sites : github.io pour
+   une page GitHub, .xyz pour un domaine ordinaire. Prendre bêtement les deux
+   derniers labels comptait, pour unclaimed-onchain.xyz, ses propres
+   sous-domaines — c'est-à-dire zéro, ce qui rassurait à tort. */
+const SUFFIXES_PARTAGES = ['github.io','vercel.app','netlify.app','pages.dev','web.app',
+  'firebaseapp.com','surge.sh','onrender.com','fleek.co','ipfs.io'];
+function voisinage(d) {
+  const p = d.split('.');
+  for (const s of SUFFIXES_PARTAGES)
+    if (d.endsWith('.' + s) && p.length > s.split('.').length) return s;
+  return p[p.length - 1];
+}
 
-(async () => {
-  console.log(`domaine vérifié : ${DOMAINE}\n`);
+async function verifier(DOMAINE, cache) {
+  console.log(`\ndomaine vérifié : ${DOMAINE}`);
   let signale = 0, injoignable = 0;
 
   for (const s of SOURCES) {
@@ -79,13 +91,20 @@ const parent = d => d.split('.').slice(-2).join('.');
   console.log('\nvoisinage : part du domaine parent déjà signalée');
   try {
     const d = JSON.parse(await (await fetch(SOURCES[0].url, { signal: AbortSignal.timeout(60000) })).text());
-    const p = parent(DOMAINE);
+    const p = voisinage(DOMAINE);
     const n = d.blacklist.filter(x => String(x).endsWith('.' + p)).length;
-    console.log(`     ${n} domaines *.${p} sur la liste noire MetaMask`
-      + (n > 50 ? ' — quartier très signalé, un domaine propre vaudrait mieux' : ''));
+    const part = (100 * n / d.blacklist.length).toFixed(1);
+    console.log(`     ${n} domaines *.${p} sur la liste noire MetaMask (${part} % de la liste)`
+      + (n > 500 ? ' — quartier très signalé' : n > 50 ? ' — quartier signalé' : ''));
   } catch (e) { console.log('     indisponible'); }
 
-  console.log(signale ? `\n${signale} SOURCE(S) SIGNALENT CE DOMAINE — agir maintenant`
-                      : '\nAUCUNE LISTE PUBLIQUE NE SIGNALE CE DOMAINE');
-  process.exit(signale ? 1 : 0);
+  return signale;
+}
+
+(async () => {
+  let total = 0;
+  for (const d of DOMAINES) total += await verifier(d);
+  console.log(total ? `\n${total} SIGNALEMENT(S) — agir maintenant`
+                    : '\nAUCUNE LISTE PUBLIQUE NE SIGNALE CES DOMAINES');
+  process.exit(total ? 1 : 0);
 })();

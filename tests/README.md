@@ -95,6 +95,9 @@ today's balance is. Keep new assertions on that side of the line.
   skipped and says so.
 - `CHROME` overrides the browser binary; unset, `run.js` finds a Chromium under
   `PLAYWRIGHT_BROWSERS_PATH`, and failing that Playwright resolves its own.
+- Suites intercept `bacbacta.github.io` and serve local bytes under it. That
+  origin is a fixture, not a claim about where the site lives — `index.html`
+  hardcodes no URL at all, so the page is indifferent to its domain.
 - No suite fetches its HTML over the network. Some do call the public RPC
   endpoints on purpose — that is the behaviour under test.
 

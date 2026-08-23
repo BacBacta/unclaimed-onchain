@@ -8,7 +8,9 @@ came to collect it. Not a bug, not a theft: the cost of the "pull" model, where
 your share is credited to your name but only moves when someone calls a withdraw
 function.
 
-**Live site:** https://bacbacta.github.io/unclaimed-onchain/
+**Live site:** https://unclaimed-onchain.xyz/ — mirrored at
+https://bacbacta.github.io/unclaimed-onchain/, same commit, both served from
+this repository.
 
 ---
 
@@ -264,6 +266,13 @@ this one, but the neighbourhood is still what a scanner weighs first. Moving to
 another free host would make that worse, not better: 187 `*.github.io` domains
 are blocked, against 2,023 on `*.vercel.app`, 3,193 on `*.netlify.app` and
 6,909 on `*.pages.dev`.
+
+The site's own domain is a `.xyz`, which is the most-flagged of the cheap
+extensions — 7,502 entries on MetaMask's list, 34,523 on ScamSniffer's, against
+a share of the world's registrations nowhere near that. It was chosen knowing
+that. It is one signal among several, and the ones above are the counterweight:
+what the file does, what it never asks for, and a source anyone can read in
+full. `node tests/outils/reputation.js` watches both addresses.
 
 ### Making the network contract enforceable
 
